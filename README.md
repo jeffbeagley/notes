@@ -61,7 +61,7 @@ The chart deploys the web app, API, media storage, database migration Job, optio
 | API image | `ghcr.io/jeffbeagley/notes-api` |
 | Web image | `ghcr.io/jeffbeagley/notes-web` |
 
-Released images and charts are signed with keyless cosign and include an SBOM and build provenance.
+Released images and charts are signed with keyless cosign. Images also include an SBOM and build provenance.
 
 ## AI Is Optional
 

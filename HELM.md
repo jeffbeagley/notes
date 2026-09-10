@@ -88,7 +88,7 @@ existing Secret.
 
 ## Verifying artifacts
 
-Every image and chart is signed with keyless cosign and carries an SBOM and build provenance.
+Every image and chart is signed with keyless cosign. Images also carry an SBOM and build provenance.
 
 ```sh
 cosign verify ghcr.io/jeffbeagley/notes-api:0.1.0 \

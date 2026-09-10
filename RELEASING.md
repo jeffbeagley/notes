@@ -16,7 +16,7 @@ Tag `v1.4.2` yields:
 
 - Chart `version: 1.4.2` and `appVersion: "1.4.2"`.
 - Image tags `1.4.2`, `1.4`, `1`, and `latest`.
-- Cosign keyless signatures, an SBOM, and SLSA build provenance on every image and on the chart.
+- Cosign keyless signatures on every image and the chart; images also receive an SBOM and build provenance.
 
 A pre-release tag such as `v1.5.0-rc.1` publishes `1.5.0-rc.1` and `1.5` only — it does not move
 `latest` or the major tag.
@@ -59,8 +59,8 @@ git tag -a v1.4.2 -m "v1.4.2"
 git push origin v1.4.2
 ```
 
-Then watch **Actions → Release**. It runs four jobs in order: `version` → `images` → `chart` →
-`release`.
+Then watch **Actions → Release**. It runs three jobs in order: `version` → `images` → `chart`,
+where `chart` also creates the GitHub Release.
 
 ## Pre-release checklist
 
@@ -90,8 +90,8 @@ cosign verify "ghcr.io/jeffbeagley/notes-api:$VERSION" \
 # SBOM
 cosign download sbom "ghcr.io/jeffbeagley/notes-api:$VERSION"
 
-# Build provenance
-gh attestation verify "oci://ghcr.io/jeffbeagley/notes-api:$VERSION" --repo jeffbeagley/notes
+# Build provenance (attached to the OCI image by Buildx)
+cosign download attestation "ghcr.io/jeffbeagley/notes-api:$VERSION"
 ```
 
 ## Fixing a bad release

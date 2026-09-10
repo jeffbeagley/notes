@@ -141,15 +141,30 @@ jobs:
         env:
           REGISTRY: ${{ env.REGISTRY }}
 
-      - id: push
-        name: Push chart
+      # Helm and cosign use separate credential stores. The Helm login above pushes the chart;
+      # cosign needs Docker credentials to upload its signature to the same OCI repository.
+      - name: Log in to GHCR for cosign
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push chart
         run: |
-          helm push "dist/notes-${{ needs.version.outputs.version }}.tgz" "oci://${CHART_REPO}" 2>&1 | tee /tmp/push.log
-          digest=$(grep -oE 'sha256:[0-9a-f]{64}' /tmp/push.log | head -1)
-          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+          version="${{ needs.version.outputs.version }}"
+          chart="oci://${CHART_REPO}/notes"
+          # A previous run may have pushed the chart before a later signing/release step failed.
+          # OCI tags are immutable, so reuse that identical tag instead of failing on a rerun.
+          if helm show chart "$chart" --version "$version" > /dev/null 2>&1; then
+            echo "Chart $chart:$version already exists; reusing it."
+          else
+            helm push "dist/notes-$version.tgz" "oci://${CHART_REPO}"
+          fi
 
       - name: Sign chart with keyless cosign
-        run: cosign sign --yes "${CHART_REPO}/notes@${{ steps.push.outputs.digest }}"
+        # Signing the immutable chart tag resolves it to the same digest and also works on reruns.
+        run: cosign sign --yes "${CHART_REPO}/notes:${{ needs.version.outputs.version }}"
 
       - name: Publish release
         uses: softprops/action-gh-release@v3
