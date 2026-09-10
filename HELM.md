@@ -240,8 +240,12 @@ helm upgrade notes oci://ghcr.io/jeffbeagley/charts/notes \
   --values notes-values.yaml
 ```
 
-Database migrations and the first-run seed run in a `pre-install`/`pre-upgrade` Job, not in the API
-containers. If the Job fails the upgrade aborts before any new pod starts. Inspect it with:
+Database migrations and the first-run seed run in a `post-install`/`pre-upgrade` Job, not in the API
+containers. On a fresh install it runs after the release's other resources (including a bundled
+postgresql/redis subchart) are created, waiting for the database to accept connections first; the
+API/web pods may briefly crash-loop until it finishes. On an upgrade it runs as `pre-upgrade`,
+before any new API pod starts, so schema changes land first and the upgrade aborts before rolling
+out new pods if it fails. Inspect it with:
 
 ```sh
 kubectl -n notes logs job/notes-notes-migrate-<revision>

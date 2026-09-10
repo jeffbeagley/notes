@@ -8,7 +8,11 @@ metadata:
     {{- include "notes.labels" . | nindent 4 }}
     app.kubernetes.io/component: migrate
   annotations:
-    helm.sh/hook: pre-install,pre-upgrade
+    # post-install (not pre-install) so the bundled postgresql/redis subcharts' Pods have actually
+    # been created by the time this runs; pre-install hooks fire before ANY normal resource in the
+    # release exists, including subchart StatefulSets, which made a first install with the bundled
+    # database impossible. Upgrades stay pre-upgrade so schema changes land before new API pods do.
+    helm.sh/hook: post-install,pre-upgrade
     helm.sh/hook-weight: "0"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
@@ -35,8 +39,27 @@ spec:
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           # Runs once per release instead of on every API replica, so concurrent replicas cannot
-          # race on the schema or on seeding the first admin account.
-          command: ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node apps/api/dist/seed.js"]
+          # race on the schema or on seeding the first admin account. The Pod for a bundled
+          # postgresql/redis subchart can still be starting up when this Job is created (Helm only
+          # guarantees the resource exists, not that it's Ready), so wait for a TCP connection
+          # before migrating instead of failing on the first attempt.
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              echo "Waiting for the database to accept connections..."
+              until node -e "
+                const net = require('net');
+                const u = new URL(process.env.DATABASE_URL);
+                const s = net.connect(Number(u.port) || 5432, u.hostname);
+                s.once('connect', () => { s.end(); process.exit(0); });
+                s.once('error', () => process.exit(1));
+              "; do
+                sleep 3
+              done
+              node_modules/.bin/prisma migrate deploy
+              node apps/api/dist/seed.js
           envFrom:
             {{- include "notes.api.envFrom" . | nindent 12 }}
           volumeMounts:
