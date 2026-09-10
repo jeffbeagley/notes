@@ -1,0 +1,24 @@
+## Exercises every optional feature so `helm template` in CI catches template regressions.
+secrets:
+  databaseUrl: postgresql://notes:pw@db.example:5432/notes?schema=public
+  redisUrl: redis://redis.example:6379
+  sessionSecret: 0123456789abcdef0123456789abcdef0123456789abcdef
+  defaultAdminPassword: ci-test-password
+ingress:
+  enabled: true
+  className: nginx
+  tls:
+    enabled: true
+    secretName: notes-tls
+networkPolicy:
+  enabled: true
+oidc:
+  enabled: true
+  issuerUrl: https://issuer.example
+  clientId: notes
+  redirectUri: https://notes.example.com/api/v1/auth/oidc/callback
+llm:
+  enabled: true
+  allowedHosts: api.openai.com
+api:
+  replicas: 2

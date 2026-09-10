@@ -1,0 +1,359 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  user
+}
+
+enum NoteType {
+  note
+  daily_briefing
+  summary
+}
+
+enum SummaryPeriod {
+  week
+  month
+  quarter
+  year
+  custom
+}
+
+enum TaskStatus {
+  todo
+  doing
+  done
+  cancelled
+}
+
+enum TaskSourceType {
+  inbox
+  journal
+  note
+}
+
+enum DocumentType {
+  note
+  journal
+  summary
+}
+
+enum LibraryItemType {
+  place
+  notebook
+  note
+}
+
+enum VersionSource {
+  autosave
+  manual
+  restore
+  rewrite_apply
+}
+
+model User {
+  id                     String                  @id @default(cuid())
+  username               String                  @unique
+  passwordHash           String
+  displayName            String?
+  assistantPrompt        String?
+  briefingPrompt         String?
+  oidcSubject            String?                 @unique
+  email                  String?                 @unique
+  role                   UserRole                @default(user)
+  enabled                Boolean                 @default(true)
+  forcePasswordChange    Boolean                 @default(false)
+  timezone               String                  @default("America/Chicago")
+  editorMode             String                  @default("wysiwyg")
+  theme                  String                  @default("system")
+  revealHiddenMode       String                  @default("toggle")
+  /// Sessions issued before this instant are rejected; bumped on password change and forced sign-out.
+  sessionsValidFrom      DateTime                @default(now())
+  lastActiveAt           DateTime?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  places                 Place[]
+  notebooks              Notebook[]
+  tags                   Tag[]
+  notes                  Note[]
+  journals               Journal[]
+  tasks                  Task[]
+  media                  Media[]
+  versions               DocumentVersion[]
+  drafts                 DocumentDraft[]
+  contextChunks          ContextChunk[]
+  favorites              Favorite[]
+  libraryViews           LibraryView[]
+  assistantConversations AssistantConversation[]
+}
+
+/// Top tier of the library hierarchy (Work, Home, a project, ...), equivalent to a BookStack shelf.
+model Place {
+  id           String     @id @default(cuid())
+  userId       String
+  name         String
+  description  String?
+  icon         String?
+  color        String?
+  coverMediaId String?
+  sortOrder    Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cover        Media?     @relation(fields: [coverMediaId], references: [id], onDelete: SetNull)
+  notebooks    Notebook[]
+
+  @@unique([userId, name])
+  @@index([userId, sortOrder])
+}
+
+/// Middle tier of the library hierarchy, equivalent to a BookStack book.
+model Notebook {
+  id           String   @id @default(cuid())
+  userId       String
+  placeId      String
+  name         String
+  description  String?
+  icon         String?
+  color        String?
+  coverMediaId String?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  place        Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  cover        Media?   @relation(fields: [coverMediaId], references: [id], onDelete: SetNull)
+  notes        Note[]
+
+  @@unique([userId, placeId, name])
+  @@index([userId, placeId, sortOrder])
+}
+
+model Favorite {
+  id         String          @id @default(cuid())
+  userId     String
+  targetType LibraryItemType
+  targetId   String
+  createdAt  DateTime        @default(now())
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetType, targetId])
+  @@index([userId, createdAt])
+}
+
+/// Per-item access log powering the "recently viewed" and "popular" home shelves.
+model LibraryView {
+  id           String          @id @default(cuid())
+  userId       String
+  targetType   LibraryItemType
+  targetId     String
+  viewCount    Int             @default(1)
+  lastViewedAt DateTime        @default(now())
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetType, targetId])
+  @@index([userId, lastViewedAt])
+  @@index([userId, viewCount])
+}
+
+model Tag {
+  id        String    @id @default(cuid())
+  userId    String
+  name      String
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes     NoteTag[]
+
+  @@unique([userId, name])
+}
+
+model Note {
+  id              String         @id @default(cuid())
+  userId          String
+  notebookId      String?
+  title           String
+  bodyMarkdown    String         @default("")
+  type            NoteType       @default(note)
+  archived        Boolean        @default(false)
+  sortOrder       Int            @default(0)
+  period          SummaryPeriod?
+  periodKey       String?
+  periodStart     DateTime?
+  periodEnd       DateTime?
+  sourceCitations Json?
+  version         Int            @default(1)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notebook        Notebook?      @relation(fields: [notebookId], references: [id], onDelete: SetNull)
+  tags            NoteTag[]
+
+  @@unique([userId, type, periodKey])
+  @@index([userId, type, updatedAt])
+  @@index([userId, notebookId, sortOrder])
+}
+
+model NoteTag {
+  noteId String
+  tagId  String
+  note   Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+}
+
+model Journal {
+  id                    String   @id @default(cuid())
+  userId                String
+  journalDate           DateTime @db.Date
+  bodyMarkdown          String   @default("")
+  suggestedCarryForward Json?
+  version               Int      @default(1)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, journalDate])
+  @@index([userId, journalDate])
+}
+
+model Task {
+  id          String         @id @default(cuid())
+  userId      String
+  title       String
+  notes       String?
+  status      TaskStatus     @default(todo)
+  dueDate     DateTime?      @db.Date
+  completedAt DateTime?
+  sourceType  TaskSourceType @default(inbox)
+  sourceId    String?
+  sortOrder   Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, dueDate])
+  @@index([userId, sourceType, sourceId])
+}
+
+model DocumentVersion {
+  id           String        @id @default(cuid())
+  userId       String
+  documentType DocumentType
+  documentId   String
+  versionN     Int
+  bodyMarkdown String
+  title        String?
+  source       VersionSource
+  createdAt    DateTime      @default(now())
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([documentType, documentId, versionN])
+  @@index([userId, documentType, documentId, createdAt])
+}
+
+model DocumentDraft {
+  id           String       @id @default(cuid())
+  userId       String
+  documentType DocumentType
+  documentId   String
+  bodyMarkdown String
+  title        String?
+  baseVersion  Int
+  updatedAt    DateTime     @updatedAt
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([documentType, documentId])
+  @@index([userId, updatedAt])
+}
+
+model ContextChunk {
+  id           String       @id @default(cuid())
+  userId       String
+  documentType DocumentType
+  documentId   String
+  title        String
+  heading      String?
+  content      String
+  chunkIndex   Int
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([documentType, documentId, chunkIndex])
+  @@index([userId, documentType, updatedAt])
+  @@index([userId, documentId])
+}
+
+model Media {
+  id             String     @id @default(cuid())
+  userId         String
+  storageKey     String     @unique
+  thumbnailKey   String?
+  originalName   String
+  mimeType       String
+  byteSize       Int
+  createdAt      DateTime   @default(now())
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  placeCovers    Place[]
+  notebookCovers Notebook[]
+
+  @@index([userId, createdAt])
+}
+
+model LlmConfig {
+  id              String   @id @default("global")
+  enabled         Boolean  @default(false)
+  baseUrl         String?
+  apiKey          String?
+  chatModel       String?
+  embeddingsModel String?
+  extraHeaders    Json?
+  timeoutMs       Int      @default(30000)
+  maxTokens       Int      @default(2048)
+  updatedAt       DateTime @updatedAt
+}
+
+model OidcConfig {
+  id           String   @id @default("global")
+  enabled      Boolean  @default(false)
+  issuerUrl    String?
+  clientId     String?
+  clientSecret String?
+  scopes       String   @default("openid profile email")
+  updatedAt    DateTime @updatedAt
+}
+
+model AssistantConversation {
+  id        String             @id @default(cuid())
+  userId    String
+  title     String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  AssistantMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+model AssistantMessage {
+  id             String                @id @default(cuid())
+  conversationId String
+  role           String
+  content        String
+  sources        Json?
+  toolCalls      Json?
+  choices        Json?
+  createdAt      DateTime              @default(now())
+  conversation   AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}

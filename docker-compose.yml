@@ -1,0 +1,71 @@
+services:
+  api:
+    image: node:22-bookworm-slim
+    env_file:
+      - .env
+    working_dir: /app
+    command: sh -c "npx prisma migrate deploy && node apps/api/dist/seed.js && node apps/api/dist/server.js"
+    environment:
+      DATABASE_URL: postgresql://notes:notes@postgres:5432/notes?schema=public
+      REDIS_URL: redis://redis:6379
+      PORT: 3000
+      MEDIA_ROOT: /data/media
+      NODE_ENV: development
+      # Local compose is plain HTTP; a real deployment must leave SECURE_COOKIES unset.
+      SECURE_COOKIES: "false"
+      ENABLE_API_DOCS: "true"
+      SESSION_SECRET: "${SESSION_SECRET:?set SESSION_SECRET in .env - generate one with openssl rand -base64 48}"
+      DEFAULT_ADMIN_USERNAME: "${DEFAULT_ADMIN_USERNAME:-admin}"
+      DEFAULT_ADMIN_PASSWORD: "${DEFAULT_ADMIN_PASSWORD:?set DEFAULT_ADMIN_PASSWORD in .env - minimum 12 characters}"
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - media-data:/data/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      API_ORIGIN: http://api:3000
+    ports:
+      - "5173:8080"
+    depends_on:
+      api:
+        condition: service_started
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: notes
+      POSTGRES_PASSWORD: notes
+      POSTGRES_DB: notes
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notes -d notes"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
+  media-data:

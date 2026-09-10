@@ -1,0 +1,194 @@
+nameOverride: ""
+fullnameOverride: ""
+
+## Pull secrets for private mirrors of the public GHCR images.
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+api:
+  replicas: 1
+  image:
+    repository: ghcr.io/jeffbeagley/notes-api
+    ## Defaults to the chart appVersion. Override only to pin a different build.
+    tag: ""
+    ## Takes precedence over tag when set, e.g. sha256:abc...
+    digest: ""
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  ## Extra ConfigMap/Secret references merged into the API and migration Job env.
+  extraEnvFrom: []
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints: []
+
+web:
+  replicas: 1
+  image:
+    repository: ghcr.io/jeffbeagley/notes-web
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints: []
+  ## nginx-unprivileged runs as uid/gid 101 and renders its config at startup, so fsGroup must
+  ## match for the writable config, cache, and run volumes.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 101
+    runAsGroup: 101
+    fsGroup: 101
+    seccompProfile:
+      type: RuntimeDefault
+
+## Applied to the API and migration pods. The image runs as the node user (uid 1000).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+## Applied to every container in the chart.
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+## Runs `prisma migrate deploy` and the first-run seed as a Helm pre-install/pre-upgrade hook, so
+## schema changes happen exactly once instead of racing across API replicas.
+migrations:
+  enabled: true
+  backoffLimit: 3
+  activeDeadlineSeconds: 900
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+config:
+  mediaRoot: /data/media
+  logLevel: info
+  ## Publishes unauthenticated Swagger UI at /docs. Keep disabled on anything internet-facing.
+  enableApiDocs: false
+  ## Set to false only when clients reach the API directly, with no ingress or reverse proxy.
+  trustProxy: true
+  ## Session cookies are marked Secure. Only disable for a plain-HTTP trial cluster.
+  secureCookies: true
+  rateLimit:
+    max: 600
+    window: "1 minute"
+    authMax: 10
+    llmMax: 30
+  bodyLimitBytes: 2097152
+  shutdownTimeoutSeconds: 15
+
+oidc:
+  enabled: false
+  issuerUrl: ""
+  clientId: ""
+  scopes: "openid profile email"
+  ## Required when OIDC is enabled: https://<your-host>/api/v1/auth/oidc/callback
+  redirectUri: ""
+  adminEmails: ""
+
+llm:
+  enabled: false
+  baseUrl: "https://api.openai.com/v1"
+  chatModel: "gpt-4o-mini"
+  embeddingsModel: ""
+  ## Comma-separated hostnames that may be used as an LLM base URL. Leave empty to permit any
+  ## public HTTPS host; you must list the host to point at an in-cluster or private model server.
+  allowedHosts: ""
+
+secrets:
+  ## Supply your own Secret instead of putting credentials in values.yaml. It must contain
+  ## DATABASE_URL, REDIS_URL, SESSION_SECRET, DEFAULT_ADMIN_PASSWORD, and optionally
+  ## OIDC_CLIENT_SECRET and LLM_API_KEY.
+  existingSecret: ""
+  ## Only used when existingSecret is empty. Required values are asserted at render time.
+  databaseUrl: ""
+  redisUrl: ""
+  ## Generate with: openssl rand -base64 48
+  sessionSecret: ""
+  defaultAdminUsername: admin
+  ## Seeds the first admin account. Minimum 12 characters; must be changed at first sign-in.
+  defaultAdminPassword: ""
+  oidcClientSecret: ""
+  llmApiKey: ""
+
+## Optional in-cluster dependencies. Both are off by default; point secrets.databaseUrl and
+## secrets.redisUrl at your own managed instances for anything you care about.
+postgresql:
+  enabled: false
+  auth:
+    username: notes
+    password: ""
+    database: notes
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
+      storageClass: ""
+
+redis:
+  enabled: false
+  architecture: standalone
+  auth:
+    enabled: false
+    password: ""
+  master:
+    persistence:
+      enabled: true
+      size: 8Gi
+      storageClass: ""
+
+## Uploaded images. ReadWriteOnce is sufficient for a single API replica; scaling api.replicas
+## above 1 requires a ReadWriteMany storage class.
+persistence:
+  enabled: true
+  existingClaim: ""
+  size: 10Gi
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+
+ingress:
+  enabled: false
+  className: ""
+  host: notes.example.com
+  # Matches the 10 MB cap the media endpoint enforces; ingress-nginx otherwise rejects uploads at 1 MB.
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 10m
+  tls:
+    enabled: false
+    secretName: ""
+
+networkPolicy:
+  enabled: false
+  ## Extra egress rules, e.g. to reach an external LLM provider or an OIDC issuer.
+  extraEgress: []

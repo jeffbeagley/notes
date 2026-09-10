@@ -1,0 +1,43 @@
+Notes {{ .Chart.AppVersion }} is installed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+Reach the app:
+{{- if .Values.ingress.enabled }}
+
+  http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.host }}
+{{- else }}
+
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "notes.fullname" . }}-web 8080:80
+  # then open http://localhost:8080
+{{- end }}
+
+Sign in:
+
+  Username: {{ .Values.secrets.defaultAdminUsername }}
+  Password: kubectl --namespace {{ .Release.Namespace }} get secret {{ include "notes.secretName" . }} -o jsonpath='{.data.DEFAULT_ADMIN_PASSWORD}' | base64 -d
+
+  You are required to change this password on first sign-in. Doing so revokes all existing sessions.
+
+{{- if not .Values.ingress.tls.enabled }}
+{{- if .Values.config.secureCookies }}
+
+WARNING: config.secureCookies is true but TLS is not configured on the Ingress. Session cookies
+carry the Secure flag and browsers will drop them over plain HTTP, so sign-in will silently fail.
+Either terminate TLS in front of this release or set config.secureCookies=false for a local trial.
+{{- end }}
+{{- end }}
+
+{{- if .Values.config.enableApiDocs }}
+
+WARNING: config.enableApiDocs is true. Swagger UI at /docs and the spec at /api/v1/openapi.json are
+served without authentication. Disable this on any internet-facing deployment.
+{{- end }}
+
+{{- if and (not .Values.postgresql.enabled) (not .Values.secrets.existingSecret) }}
+{{- if not .Values.secrets.databaseUrl }}
+
+NOTE: You are using an external database. Back up the "{{ include "notes.secretName" . }}" Secret --
+it holds SESSION_SECRET, and losing it signs every user out.
+{{- end }}
+{{- end }}
+
+Full configuration reference: https://github.com/jeffbeagley/notes/blob/main/HELM.md

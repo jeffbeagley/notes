@@ -1,0 +1,195 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  CHART_REPO: ghcr.io/${{ github.repository_owner }}/charts
+
+jobs:
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+    steps:
+      - id: v
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' is not a semver tag like v1.2.3 or v1.2.3-rc.1"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Anything with a pre-release suffix is published but not marked "latest".
+          if [[ "$version" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  images:
+    name: Publish ${{ matrix.component }} image
+    runs-on: ubuntu-latest
+    needs: version
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [api, web]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/notes-${{ matrix.component }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}},enable=${{ needs.version.outputs.prerelease == 'false' }}
+            type=raw,value=latest,enable=${{ needs.version.outputs.prerelease == 'false' }}
+          labels: |
+            org.opencontainers.image.title=notes-${{ matrix.component }}
+            org.opencontainers.image.description=Self-hosted notes, daily journal, tasks, and AI assistant
+            org.opencontainers.image.licenses=MIT
+
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/${{ matrix.component }}/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.component }}
+          # Build provenance and an SBOM are attached to the image as OCI attestations.
+          provenance: mode=max
+          sbom: true
+
+      - uses: sigstore/cosign-installer@v4.1.2
+
+      - name: Sign image with keyless cosign
+        run: |
+          cosign sign --yes \
+            "${REGISTRY}/${OWNER}/notes-${COMPONENT}@${DIGEST}"
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          OWNER: ${{ github.repository_owner }}
+          COMPONENT: ${{ matrix.component }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ github.repository_owner }}/notes-${{ matrix.component }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  chart:
+    name: Publish Helm chart and release
+    runs-on: ubuntu-latest
+    needs: [version, images]
+    permissions:
+      # contents: write is needed to create the GitHub Release in the final step.
+      contents: write
+      packages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: v3.18.6
+
+      - uses: sigstore/cosign-installer@v4.1.2
+
+      - name: Stamp chart version from the tag
+        run: |
+          # The tag is the single source of truth for both the chart and the images it points at.
+          helm_version="${{ needs.version.outputs.version }}"
+          sed -i "s/^version:.*/version: ${helm_version}/" deploy/helm/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: \"${helm_version}\"/" deploy/helm/Chart.yaml
+          sed -i "s#repository: ghcr.io/.*/notes-api#repository: ${REGISTRY}/${OWNER}/notes-api#" deploy/helm/values.yaml
+          sed -i "s#repository: ghcr.io/.*/notes-web#repository: ${REGISTRY}/${OWNER}/notes-web#" deploy/helm/values.yaml
+          grep -E "^(version|appVersion):" deploy/helm/Chart.yaml
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          OWNER: ${{ github.repository_owner }}
+
+      - name: Package
+        run: |
+          helm dependency build deploy/helm
+          helm package deploy/helm --destination dist
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login "${REGISTRY}" --username "${{ github.actor }}" --password-stdin
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+
+      - id: push
+        name: Push chart
+        run: |
+          helm push "dist/notes-${{ needs.version.outputs.version }}.tgz" "oci://${CHART_REPO}" 2>&1 | tee /tmp/push.log
+          digest=$(grep -oE 'sha256:[0-9a-f]{64}' /tmp/push.log | head -1)
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Sign chart with keyless cosign
+        run: cosign sign --yes "${CHART_REPO}/notes@${{ steps.push.outputs.digest }}"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v3
+        with:
+          name: v${{ needs.version.outputs.version }}
+          generate_release_notes: true
+          prerelease: ${{ needs.version.outputs.prerelease == 'true' }}
+          files: dist/*.tgz
+          body: |
+            ## Install
+
+            ```sh
+            helm install notes oci://${{ env.CHART_REPO }}/notes \
+              --version ${{ needs.version.outputs.version }} \
+              --namespace notes --create-namespace \
+              --values my-values.yaml
+            ```
+
+            ## Artifacts
+
+            | Artifact | Reference |
+            | --- | --- |
+            | Helm chart | `oci://${{ env.CHART_REPO }}/notes:${{ needs.version.outputs.version }}` |
+            | API image | `ghcr.io/${{ github.repository_owner }}/notes-api:${{ needs.version.outputs.version }}` |
+            | Web image | `ghcr.io/${{ github.repository_owner }}/notes-web:${{ needs.version.outputs.version }}` |
+
+            All artifacts are signed with keyless cosign. Verify with:
+
+            ```sh
+            cosign verify ghcr.io/${{ github.repository_owner }}/notes-api:${{ needs.version.outputs.version }} \
+              --certificate-identity-regexp '^https://github.com/${{ github.repository }}/' \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com
+            ```
+
+            See [RELEASING.md](https://github.com/${{ github.repository }}/blob/main/RELEASING.md) and [HELM.md](https://github.com/${{ github.repository }}/blob/main/HELM.md).

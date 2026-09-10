@@ -1,0 +1,28 @@
+apiVersion: v2
+name: notes
+description: Self-hosted notes, daily journal, tasks, and AI assistant
+type: application
+# Both fields are rewritten from the git tag by the release workflow.
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.25.0-0"
+home: https://github.com/jeffbeagley/notes
+sources:
+  - https://github.com/jeffbeagley/notes
+keywords:
+  - notes
+  - journal
+  - tasks
+  - self-hosted
+maintainers:
+  - name: jeffbeagley
+    url: https://github.com/jeffbeagley
+dependencies:
+  - name: postgresql
+    version: 18.8.17
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: postgresql.enabled
+  - name: redis
+    version: 28.0.15
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: redis.enabled

@@ -1,0 +1,38 @@
+{{- $fullname := include "notes.fullname" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-config
+  labels:
+    {{- include "notes.labels" . | nindent 4 }}
+data:
+  NODE_ENV: "production"
+  APP_VERSION: {{ .Chart.AppVersion | quote }}
+  PORT: "3000"
+  HOST: "0.0.0.0"
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  MEDIA_ROOT: {{ .Values.config.mediaRoot | quote }}
+  ENABLE_API_DOCS: {{ .Values.config.enableApiDocs | quote }}
+  TRUST_PROXY: {{ .Values.config.trustProxy | quote }}
+  SECURE_COOKIES: {{ .Values.config.secureCookies | quote }}
+  RATE_LIMIT_MAX: {{ .Values.config.rateLimit.max | quote }}
+  RATE_LIMIT_WINDOW: {{ .Values.config.rateLimit.window | quote }}
+  AUTH_RATE_LIMIT_MAX: {{ .Values.config.rateLimit.authMax | quote }}
+  LLM_RATE_LIMIT_MAX: {{ .Values.config.rateLimit.llmMax | quote }}
+  BODY_LIMIT_BYTES: {{ .Values.config.bodyLimitBytes | quote }}
+  SHUTDOWN_TIMEOUT_MS: {{ mul .Values.config.shutdownTimeoutSeconds 1000 | quote }}
+  DEFAULT_ADMIN_USERNAME: {{ .Values.secrets.defaultAdminUsername | quote }}
+{{- if .Values.oidc.enabled }}
+  OIDC_ISSUER_URL: {{ required "oidc.issuerUrl is required when oidc.enabled is true" .Values.oidc.issuerUrl | quote }}
+  OIDC_CLIENT_ID: {{ required "oidc.clientId is required when oidc.enabled is true" .Values.oidc.clientId | quote }}
+  OIDC_SCOPES: {{ .Values.oidc.scopes | quote }}
+  OIDC_REDIRECT_URI: {{ required "oidc.redirectUri is required when oidc.enabled is true (https://<host>/api/v1/auth/oidc/callback)" .Values.oidc.redirectUri | quote }}
+  OIDC_ADMIN_EMAILS: {{ .Values.oidc.adminEmails | quote }}
+{{- end }}
+  LLM_ENABLED: {{ .Values.llm.enabled | quote }}
+{{- if .Values.llm.enabled }}
+  LLM_BASE_URL: {{ .Values.llm.baseUrl | quote }}
+  LLM_CHAT_MODEL: {{ .Values.llm.chatModel | quote }}
+  LLM_EMBEDDINGS_MODEL: {{ .Values.llm.embeddingsModel | quote }}
+  LLM_ALLOWED_HOSTS: {{ .Values.llm.allowedHosts | quote }}
+{{- end }}

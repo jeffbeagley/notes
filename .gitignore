@@ -1,0 +1,13 @@
+node_modules
+.env
+test-results
+playwright-report
+# Build output. Run `npm run build` after cloning; the images build it themselves.
+apps/api/dist/
+apps/web/dist/
+*.tsbuildinfo
+# Vendored Helm subcharts; Chart.lock is committed instead.
+deploy/helm/charts/
+# Rendered by CI for schema validation.
+helm-rendered.yaml
+
