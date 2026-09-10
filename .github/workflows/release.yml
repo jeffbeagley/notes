@@ -43,7 +43,6 @@ jobs:
       contents: read
       packages: write
       id-token: write
-      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -98,13 +97,6 @@ jobs:
           OWNER: ${{ github.repository_owner }}
           COMPONENT: ${{ matrix.component }}
           DIGEST: ${{ steps.build.outputs.digest }}
-
-      - name: Attest build provenance
-        uses: actions/attest-build-provenance@v4
-        with:
-          subject-name: ${{ env.REGISTRY }}/${{ github.repository_owner }}/notes-${{ matrix.component }}
-          subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
 
   chart:
     name: Publish Helm chart and release
