@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import { replaceContextChunks, sanitizeForAssistant } from './context.js';
+import { hybridChunkSearch } from './retrieval.js';
 import { journalBody, localDate } from './journal.js';
 
 // OpenAI-compatible tool/function schemas exposed to the assistant.
@@ -222,11 +223,7 @@ async function searchNotes(prisma: PrismaClient, userId: string, query: string):
   const terms = [...new Set((query.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []))].slice(0, 6);
   if (!terms.length) return { ok: false, summary: 'No search terms provided', content: 'No search terms provided.' };
   const [chunks, tasks] = await Promise.all([
-    prisma.contextChunk.findMany({
-      where: { userId, OR: terms.flatMap((term) => [{ title: { contains: term, mode: 'insensitive' as const } }, { heading: { contains: term, mode: 'insensitive' as const } }, { content: { contains: term, mode: 'insensitive' as const } }]) },
-      orderBy: { updatedAt: 'desc' },
-      take: 8,
-    }),
+    hybridChunkSearch(prisma, userId, query, 8),
     prisma.task.findMany({
       where: { userId, OR: terms.flatMap((term) => [{ title: { contains: term, mode: 'insensitive' as const } }, { notes: { contains: term, mode: 'insensitive' as const } }]) },
       take: 8,

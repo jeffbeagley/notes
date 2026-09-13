@@ -1,7 +1,8 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
+import { enqueueEmbedChunks } from './queue.js';
 
 type ContextClient = PrismaClient | Prisma.TransactionClient;
-type DocumentKind = 'note' | 'journal';
+export type DocumentKind = 'note' | 'journal';
 
 export function sanitizeForAssistant(markdown: string) {
   return markdown
@@ -55,6 +56,7 @@ export async function replaceContextChunks(client: ContextClient, userId: string
   if (chunks.length) {
     await client.contextChunk.createMany({ data: chunks.map((chunk, chunkIndex) => ({ userId, documentType, documentId, title, heading: chunk.heading, content: chunk.content, chunkIndex })) });
   }
+  await enqueueEmbedChunks(userId, documentType, documentId);
 }
 
 export async function ensureContextChunks(client: PrismaClient, userId: string) {

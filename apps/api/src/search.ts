@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { currentUser } from './auth.js';
 import { callLlm, getLlmConfig } from './llm.js';
 import { ensureContextChunks } from './context.js';
+import { hybridChunkSearch } from './retrieval.js';
 import { TOOL_DEFINITIONS, executeTool } from './tools.js';
 import type { ToolChoicePrompt } from './tools.js';
 import { localDate } from './journal.js';
@@ -86,23 +87,26 @@ async function retrieveAssistantContext(prisma: PrismaClient, userId: string, qu
   await ensureContextChunks(prisma, userId);
   const terms = searchTerms(question);
   const isTaskRequest = /\b(all|my|open|closed|today)\b[\s\S]*\btasks?\b|\btasks?\b[\s\S]*\b(all|my|open|closed|today)\b/i.test(question);
-  const [chunks, tasks] = await Promise.all([
-    prisma.contextChunk.findMany({
-      where: { userId, ...(terms.length ? { OR: terms.flatMap((term) => [{ title: { contains: term, mode: 'insensitive' as const } }, { heading: { contains: term, mode: 'insensitive' as const } }, { content: { contains: term, mode: 'insensitive' as const } }]) } : {}) },
-      orderBy: { updatedAt: 'desc' },
-      take: 12,
-    }),
+  const [hybridChunks, tasks] = await Promise.all([
+    hybridChunkSearch(prisma, userId, question, 12),
     prisma.task.findMany({
       where: { userId, ...(isTaskRequest ? {} : terms.length ? { OR: terms.flatMap((term) => [{ title: { contains: term, mode: 'insensitive' as const } }, { notes: { contains: term, mode: 'insensitive' as const } }]) } : {}) },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
       take: isTaskRequest ? 50 : 12,
     }),
   ]);
-  const chunkSources = chunks.map((chunk) => {
-    const haystack = `${chunk.title} ${chunk.heading ?? ''} ${chunk.content}`.toLowerCase();
-    const relevance = terms.reduce((score, term) => score + (haystack.match(new RegExp(term, 'g'))?.length ?? 0), 0);
-    return { id: chunk.documentId, type: chunk.documentType, title: chunk.title, snippet: chunk.content.slice(0, 220), date: chunk.updatedAt.toISOString().split('T')[0], body: `${chunk.heading ? `${chunk.heading}\n` : ''}${chunk.content}`, relevance };
-  }).sort((first, second) => second.relevance - first.relevance || second.date.localeCompare(first.date));
+  // Neither retrieval method matched (e.g. a vague or greeting-style question) — fall back to recent content instead of returning nothing.
+  const fusedChunks = hybridChunks.length
+    ? hybridChunks
+    : await prisma.contextChunk.findMany({ where: { userId }, orderBy: { updatedAt: 'desc' }, take: 12 });
+  const chunkSources = fusedChunks.map((chunk) => ({
+    id: chunk.documentId,
+    type: chunk.documentType,
+    title: chunk.title,
+    snippet: chunk.content.slice(0, 220),
+    date: chunk.updatedAt.toISOString().split('T')[0],
+    body: `${chunk.heading ? `${chunk.heading}\n` : ''}${chunk.content}`,
+  }));
   const taskSources = tasks.map((task) => ({ id: task.id, type: 'task', title: task.title, snippet: `Status: ${task.status}`, date: task.createdAt.toISOString().split('T')[0], body: `Status: ${task.status}${task.dueDate ? `\nDue: ${task.dueDate.toISOString().split('T')[0]}` : ''}${task.notes ? `\n${task.notes}` : ''}` }));
   const sources = (isTaskRequest ? [...taskSources, ...chunkSources] : [...chunkSources, ...taskSources]).slice(0, 20);
   const taskAnswer = `Your tasks:\n\n${taskSources.map((task) => `- ${task.title}: ${task.snippet.replace('Status: ', '')}${task.body.includes('\nDue: ') ? ` (${task.body.split('\nDue: ')[1].split('\n')[0]})` : ''}`).join('\n') || 'No tasks found.'}`;

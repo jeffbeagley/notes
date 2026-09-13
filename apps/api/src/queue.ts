@@ -2,7 +2,8 @@ import { Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 import pino from 'pino';
 import type { PrismaClient } from '@prisma/client';
-import { callLlm, getLlmConfig } from './llm.js';
+import { callLlm, embeddingsAvailable, embedTexts, getLlmConfig } from './llm.js';
+import type { DocumentKind } from './context.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL ?? 'info', name: 'worker' });
 
@@ -25,6 +26,25 @@ export const jobQueue = new Queue('notes-jobs', {
 export async function closeQueue() {
   await jobQueue.close().catch(() => undefined);
   await redisConnection.quit().catch(() => undefined);
+}
+
+/// Best-effort, fire-and-forget: called after every note/journal save. Cheap to enqueue even when
+/// no embeddings model is configured; processEmbedChunks no-ops in that case.
+export async function enqueueEmbedChunks(userId: string, documentType: DocumentKind, documentId: string) {
+  // Small delay so the job runs after the enclosing Prisma transaction has committed.
+  await jobQueue.add('embed_chunks', { userId, documentType, documentId }, { delay: 2000 }).catch((err) => {
+    logger.error({ err, userId, documentType, documentId }, 'failed to enqueue embed_chunks job');
+  });
+}
+
+export async function processEmbedChunks(prisma: PrismaClient, userId: string, documentType: DocumentKind, documentId: string) {
+  if (!(await embeddingsAvailable(prisma))) return;
+  const chunks = await prisma.contextChunk.findMany({ where: { userId, documentType, documentId }, orderBy: { chunkIndex: 'asc' } });
+  if (!chunks.length) return;
+  const texts = chunks.map((chunk) => `${chunk.heading ? `${chunk.heading}\n` : ''}${chunk.content}`);
+  const embeddings = await embedTexts(prisma, texts);
+  if (!embeddings) return;
+  await Promise.all(chunks.map((chunk, index) => prisma.contextChunk.update({ where: { id: chunk.id }, data: { embedding: embeddings[index] ?? [] } })));
 }
 
 export async function processCarryForward(prisma: PrismaClient, journalId: string, userId: string) {
@@ -83,6 +103,10 @@ export function startWorker(prisma: PrismaClient) {
       if (job.name === 'carry_forward') {
         const { journalId, userId } = job.data as { journalId: string; userId: string };
         await processCarryForward(prisma, journalId, userId);
+      }
+      if (job.name === 'embed_chunks') {
+        const { userId, documentType, documentId } = job.data as { userId: string; documentType: DocumentKind; documentId: string };
+        await processEmbedChunks(prisma, userId, documentType, documentId);
       }
     },
     { connection: workerConnection }

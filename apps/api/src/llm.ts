@@ -148,6 +148,42 @@ export async function callLlm(prisma: PrismaClient, messages: { role: string; co
   }
 }
 
+export async function embeddingsAvailable(prisma: PrismaClient) {
+  const config = await getLlmConfig(prisma);
+  return Boolean(config.enabled && config.embeddingsModel);
+}
+
+/// Returns null (never throws) when embeddings aren't configured or the call fails, so callers can
+/// silently fall back to keyword-only search instead of breaking note/journal saves.
+export async function embedTexts(prisma: PrismaClient, texts: string[]): Promise<number[][] | null> {
+  if (!texts.length) return [];
+  const config = await getLlmConfig(prisma);
+  if (!config.enabled || !config.embeddingsModel) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+  try {
+    const response = await fetch(`${config.baseUrl.replace(/\/$/, '')}/embeddings`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(config.apiKey ? { authorization: `Bearer ${config.apiKey}` } : {}),
+        ...config.extraHeaders,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({ model: config.embeddingsModel, input: texts }),
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as { data?: { embedding?: number[]; index?: number }[] };
+    if (!data.data || data.data.length !== texts.length) return null;
+    return [...data.data].sort((a, b) => (a.index ?? 0) - (b.index ?? 0)).map((item) => item.embedding ?? []);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export function registerLlmRoutes(app: FastifyInstance, prisma: PrismaClient) {
   // Admin LLM Config
   app.get('/api/v1/admin/llm-config', async (request, reply) => {
