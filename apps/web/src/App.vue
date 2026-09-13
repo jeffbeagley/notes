@@ -1,4 +1,3 @@
-.assistant-message p { margin: 0; white-space: pre-wrap; }.assistant-message-actions { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.65rem; }.assistant-message-actions button { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.22rem 0.35rem; border: 0; border-radius: 4px; color: #777b83; background: transparent; font-size: 0.64rem; }.assistant-message-actions button:hover { color: #7650dc; background: #ececef; }.assistant-message.user .assistant-message-actions button { color: #eee9ff; }.assistant-message.user .assistant-message-actions button:hover { color: #fff; background: #7650dc; }.assistant-markdown > :first-child { margin-top: 0; }
 <template>
   <main :class="{ 'auth-main': !user }">
     <div v-if="authChecking" class="auth-loading" aria-label="Loading Notes" />
@@ -13,9 +12,9 @@
       <p v-if="error" class="error">{{ error }}</p>
     </form>
     <section v-else class="workspace" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
-      <aside class="app-sidebar">
+      <aside class="app-sidebar" :class="{ 'mobile-nav-open': mobileNavOpen }">
         <div class="sidebar-heading"><button class="brand" title="Go to home" @click="goHome"><span class="brand-mark">N</span><span class="nav-label">Notes</span></button><button class="sidebar-toggle" :aria-expanded="!sidebarCollapsed" :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'" @click="sidebarCollapsed = !sidebarCollapsed"><PanelLeft :size="15" :stroke-width="1.8" /></button></div>
-        <nav class="primary-nav" aria-label="Primary navigation">
+        <nav class="primary-nav" aria-label="Primary navigation" @click="mobileNavOpen = false">
           <button class="note-link" :class="{ active: view === 'home' }" @click="goHome"><Home class="nav-icon" :size="15" :stroke-width="1.8" /><span class="nav-label">Home</span></button>
           <button class="note-link" :class="{ active: view === 'journal' }" @click="openJournal"><Calendar class="nav-icon" :size="15" :stroke-width="1.8" /><span class="nav-label">Today</span></button>
           <button class="note-link" :class="{ active: view === 'journalArchive' || view === 'journalEntry' }" @click="openJournalArchive"><BookOpen class="nav-icon" :size="15" :stroke-width="1.8" /><span class="nav-label">Journal archive</span></button>
@@ -25,7 +24,7 @@
           <button class="note-link" :class="{ active: view === 'summaries' }" @click="openSummaries()"><BarChart3 class="nav-icon" :size="15" :stroke-width="1.8" /><span class="nav-label">Summaries</span></button>
         </nav>
         <div class="sidebar-section-label"><span class="nav-label">Library</span><button title="Create place" @click="openLibraryDialog('place', 'create')"><Plus :size="15" :stroke-width="1.8" /></button></div>
-        <div class="library-tree">
+        <div class="library-tree" @click="mobileNavOpen = false">
           <button class="note-link" :class="{ active: view === 'places' }" @click="openPlaces()"><Library class="nav-icon" :size="15" :stroke-width="1.8" /><span class="nav-label">All places</span></button>
           <div v-for="place in places" :key="place.id" class="tree-place">
             <div
@@ -78,7 +77,9 @@
           <button class="profile-card" @click="logout"><span class="avatar">{{ (user.displayName || user.username).slice(0, 1).toUpperCase() }}</span><span class="profile-copy nav-label"><strong>{{ user.displayName || user.username }}</strong><small>Sign out</small></span><ChevronDown class="profile-chevron" :size="14" :stroke-width="1.8" /></button>
         </div>
       </aside>
+      <button v-if="mobileNavOpen" class="mobile-nav-backdrop" aria-label="Close navigation" @click="mobileNavOpen = false" />
       <header class="workspace-topbar">
+        <button class="mobile-nav-toggle" :aria-expanded="mobileNavOpen" aria-label="Open navigation" @click="mobileNavOpen = !mobileNavOpen"><Menu :size="18" :stroke-width="1.8" /></button>
         <Breadcrumbs :items="breadcrumbs" />
         <form class="global-search" @submit.prevent="submitGlobalSearch">
           <Search :size="16" :stroke-width="1.8" />
@@ -308,12 +309,13 @@
         <div v-if="selectionRewriteOpen" class="confirm-backdrop"><section class="confirm-dialog ai-dialog rewrite-dialog" role="dialog" aria-modal="true" aria-labelledby="rewrite-ai-title"><header><h2 id="rewrite-ai-title">Rewrite selection</h2><button class="quiet" @click="selectionRewriteOpen = false">Close</button></header><label>Style <select v-model="rewriteStyle" aria-label="Rewrite style"><option value="Improve clarity and concision.">Clear and concise</option><option value="Make the tone more professional while preserving meaning.">Professional</option><option value="Make the tone warmer and friendlier while preserving meaning.">Friendly</option><option value="Simplify the language while preserving meaning.">Simplify</option></select></label><label>Additional instruction <input v-model="rewriteInstruction" aria-label="Additional rewrite instruction" placeholder="Optional instruction" /></label><div class="rewrite-source"><strong>Selected text</strong><p>{{ selectionRewriteText }}</p></div><button :disabled="aiLoading === 'rewrite'" @click="requestSelectionRewrite">{{ aiLoading === 'rewrite' ? 'Generating...' : 'Generate rewrite' }}</button><p v-if="aiError" class="error">{{ aiError }}</p><div v-if="selectionRewriteSuggestion" class="rewrite-diff"><strong>Review changes</strong><del>{{ selectionRewriteText }}</del><ins>{{ selectionRewriteSuggestion }}</ins></div><div class="dialog-actions"><button class="quiet" @click="selectionRewriteOpen = false">Cancel</button><button :disabled="!selectionRewriteSuggestion" @click="applySelectionRewrite">Apply replacement</button></div></section></div>
       </article>
       <article v-else-if="journal" class="editor" :class="{ 'editor-dark': editorDark }">
-        <header>
+        <header class="journal-editor-header">
           <button class="quiet" title="Older entry" :disabled="!canGoOlderJournal" @click="goToAdjacentJournal('older')"><ChevronLeft :size="15" :stroke-width="1.8" /></button>
           <strong>{{ isHistoricalJournal ? formatJournalDate(journal.journalDate) : 'Today' }}</strong>
           <button class="quiet" title="Newer entry" :disabled="!canGoNewerJournal" @click="goToAdjacentJournal('newer')"><ChevronRight :size="15" :stroke-width="1.8" /></button>
           <span class="save-status">{{ journalSaveStatus }}</span><button class="quiet" title="Open journal assistant" @click="journalAssistantOpen = true"><MessageSquare :size="15" :stroke-width="1.8" />Assistant</button><button class="quiet" title="Save journal version" @click="saveJournal('manual')">Save version</button><button v-if="!isHistoricalJournal" class="quiet" title="Journal version history" @click="toggleVersions">History</button></header>
-        <section v-if="journal.suggestedCarryForward?.suggestions?.length" class="carry-forward-panel">
+        <button v-if="journal.suggestedCarryForward?.suggestions?.length" class="carry-forward-toggle" :aria-expanded="carryForwardOpen" @click="carryForwardOpen = !carryForwardOpen"><List :size="15" :stroke-width="1.8" />Suggested items <span>{{ journal.suggestedCarryForward.suggestions.length }}</span></button>
+        <section v-if="journal.suggestedCarryForward?.suggestions?.length" class="carry-forward-panel" :class="{ 'carry-forward-expanded': carryForwardOpen }">
           <h3>Suggested carry-forward items</h3>
           <div v-for="s in journal.suggestedCarryForward.suggestions" :key="s" class="carry-item">
             <span>{{ s }}</span>
@@ -392,11 +394,12 @@
         </section>
       </article>
       <article v-else-if="view === 'assistant'" class="tasks assistant-view">
-        <header><h2>Assistant</h2><button class="quiet" @click="clearAssistant">New chat</button></header>
+        <header><h2>Assistant</h2><div class="assistant-header-actions"><button class="quiet assistant-history-toggle" :aria-expanded="assistantHistoryOpen" @click="assistantHistoryOpen = !assistantHistoryOpen"><List :size="14" :stroke-width="1.8" />Chat history</button><button class="quiet" @click="clearAssistant">New chat</button></div></header>
         <div class="assistant-layout">
-          <aside class="assistant-history">
+          <button v-if="assistantHistoryOpen" class="assistant-history-backdrop" aria-label="Close chat history" @click="assistantHistoryOpen = false" />
+          <aside class="assistant-history" :class="{ 'mobile-history-open': assistantHistoryOpen }">
             <p v-if="!assistantConversations.length" class="muted">No past conversations yet.</p>
-            <div v-for="conversation in assistantConversations" :key="conversation.id" class="assistant-history-item" :class="{ active: conversation.id === activeConversationId }" @click="openConversation(conversation.id)">
+            <div v-for="conversation in assistantConversations" :key="conversation.id" class="assistant-history-item" :class="{ active: conversation.id === activeConversationId }" @click="openConversation(conversation.id); assistantHistoryOpen = false">
               <span class="assistant-history-text"><strong>{{ conversation.title || 'New conversation' }}</strong><small>{{ new Date(conversation.updatedAt).toLocaleDateString() }}</small></span>
               <button type="button" class="assistant-history-delete" title="Delete conversation" @click="deleteConversation(conversation.id, $event)"><Trash2 :size="13" /></button>
             </div>
@@ -475,7 +478,7 @@ import CodeBlockView from './components/CodeBlockView.vue';
 import { HiddenText } from './extensions/HiddenText';
 import hljs from 'highlight.js';
 import MarkdownIt from 'markdown-it';
-import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ArrowUpRight, BarChart3, Bold, Book, BookOpen, Calendar, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, Code2, FileText, GripVertical, Heading2, Highlighter, HelpCircle, Home, ImagePlus, Italic, LayoutGrid, Library, Link2, List, ListChecks, MessageSquare, Moon, PanelLeft, Plus, Quote, Redo2, Replace, Rows3, Search, Settings, Sparkles, Star, Strikethrough, Subscript as SubscriptIcon, Superscript as SuperscriptIcon, Sun, Trash2, Underline as UnderlineIcon, Undo2, X } from '@lucide/vue';
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ArrowUpRight, BarChart3, Bold, Book, BookOpen, Calendar, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, Code2, FileText, GripVertical, Heading2, Highlighter, HelpCircle, Home, ImagePlus, Italic, LayoutGrid, Library, Link2, List, ListChecks, Menu, MessageSquare, Moon, PanelLeft, Plus, Quote, Redo2, Replace, Rows3, Search, Settings, Sparkles, Star, Strikethrough, Subscript as SubscriptIcon, Superscript as SuperscriptIcon, Sun, Trash2, Underline as UnderlineIcon, Undo2, X } from '@lucide/vue';
 
 type User = { id: string; username: string; displayName: string | null; role: string; timezone: string; forcePasswordChange: boolean };
 type UserSettings = { username: string; displayName: string | null; email: string | null; role: string; timezone: string; assistantPrompt: string; briefingPrompt: string };
@@ -544,10 +547,13 @@ const rewriteStyle = ref('Improve clarity and concision.');
 const rewriteInstruction = ref('');
 const selectionRewriteSuggestion = ref('');
 const journal = ref<Journal | null>(null);
+const carryForwardOpen = ref(false);
 const briefing = ref<Note | null>(null);
 const generatingBriefing = ref(false);
 const activeSummaryTitle = ref<string | null>(null);
 const sidebarCollapsed = ref(false);
+const mobileNavOpen = ref(false);
+const assistantHistoryOpen = ref(false);
 const view = ref<'home' | 'notes' | 'places' | 'place' | 'notebook' | 'unfiled' | 'journal' | 'journalArchive' | 'journalEntry' | 'tasks' | 'briefing' | 'search' | 'assistant' | 'summaries' | 'settings'>('home');
 const searchQuery = ref('');
 const searchMode = ref<'keyword' | 'llm'>('keyword');
@@ -2576,11 +2582,12 @@ input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; color:
 
 /* Main workspace presentation */
 :root { color: #1c1d21; background: #eef0f2; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-body { margin: 0; min-width: 320px; background: #eef0f2; }
+body { margin: 0; min-width: 0; background: #eef0f2; }
 .workspace { display: grid; grid-template-columns: 13.5rem minmax(0, 1fr); min-height: 100vh; grid-template-rows: 3.5rem minmax(0, 1fr); gap: 0; padding: 0; box-sizing: border-box; }
 .workspace > aside { display: flex; flex-direction: column; gap: 0.3rem; padding: 1.5rem 0.9rem 1rem; background: #173d36; color: #e7e9dd; grid-row: 1 / -1; }
 .workspace > article { grid-column: 2; grid-row: 2; }
 .workspace-topbar { display: flex; align-items: center; gap: 0.75rem; min-width: 0; overflow: visible; padding: 0 1.2rem; border-bottom: 1px solid #e4e5e7; }
+.mobile-nav-toggle, .mobile-nav-backdrop { display: none; }
 .workspace-topbar > .breadcrumbs { flex: 0 1 auto; min-width: 0; }
 .workspace-topbar > .global-search { flex: 1 1 0; min-width: 0; max-width: 31rem; }
 .global-search { display: flex; position: relative; align-items: center; gap: 0.55rem; width: min(100%, 31rem); min-width: 0; margin: 0 auto; padding: 0.42rem 0.5rem 0.42rem 0.7rem; border: 1px solid #e0e2e5; border-radius: 8px; color: #a0a3aa; background: #fff; box-shadow: 0 2px 8px #59616d08; }
@@ -2806,6 +2813,7 @@ body { margin: 0; min-width: 320px; background: #eef0f2; }
 .search-answer, .search-results { margin-top: 1.25rem; }
 .search-answer { padding: 1rem 1.1rem; border: 1px solid #e3e4e7; border-radius: 9px; background: #fff; color: #4b4d54; font-size: 0.82rem; line-height: 1.7; box-shadow: 0 5px 18px #59616d0a; }
 .search-answer h3, .search-results h3 { margin: 0 0 0.75rem; color: #313238; font-size: 0.8rem; font-weight: 700; }
+.assistant-header-actions { display: flex; align-items: center; gap: 0.4rem; }.assistant-history-toggle, .assistant-history-backdrop { display: none; }
 .search-results h3 span { display: inline-grid; min-width: 1.25rem; height: 1.25rem; place-items: center; margin-left: 0.3rem; border-radius: 50%; color: #7650dc; background: #f2efff; font-size: 0.64rem; }
 .search-result { display: block; width: 100%; padding: 0.85rem 0.9rem; border: 1px solid #e5e6e8; border-bottom: 0; color: #45474e; background: #fff; text-align: left; }
 .search-result:first-of-type { border-radius: 9px 9px 0 0; }.search-result:last-of-type { border-bottom: 1px solid #e5e6e8; border-radius: 0 0 9px 9px; }
@@ -2826,6 +2834,7 @@ body { margin: 0; min-width: 320px; background: #eef0f2; }
 .period-node-label { flex: 1; }
 .carry-forward-panel { padding: 1rem; border: 1px solid #ddd3ff; border-radius: 9px; background: #faf9ff; margin-bottom: 1rem; margin: 1.25rem clamp(1.25rem, 4vw, 3.5rem) 1rem; }
 .carry-forward-panel h3 { margin: 0 0 0.5rem; color: #7650dc; font-size: 0.78rem; font-family: inherit; }
+.carry-forward-toggle { display: none; }
 .carry-item { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid #f2e2dc; border-bottom-color: #eeeafd; font-size: 0.78rem; }
 .briefing-content { padding: 1.35rem; background: #fff; border: 1px solid #e3e4e7; border-radius: 9px; line-height: 1.75; margin: 1.5rem clamp(1.25rem, 4vw, 3.5rem) 0; color: #4b4d54; font-size: 0.88rem; box-shadow: 0 5px 18px #59616d0a; }
 .empty { margin-top: 20vh; padding: 5rem 2rem; width: auto; margin: 2.5rem 3.5rem 3rem; text-align: center; }
@@ -2855,19 +2864,37 @@ body { margin: 0; min-width: 320px; background: #eef0f2; }
 .tag-input { display: flex; gap: 0.35rem; }.tag-input button { display: grid; width: 2.1rem; place-items: center; border: 1px solid #ddd3ff; border-radius: 6px; color: #7650dc; background: #faf9ff; }.ai-dialog { display: grid; gap: 0.8rem; width: min(100%, 36rem); }.ai-dialog > header { display: flex; align-items: center; justify-content: space-between; }.ai-dialog label { display: grid; gap: 0.35rem; color: #666a73; font-size: 0.72rem; }.ai-dialog :is(input, select) { width: 100%; box-sizing: border-box; border: 1px solid #e0e2e5; border-radius: 6px; background: #fff; color: #45474e; }.ai-dialog > button { width: fit-content; padding: 0.5rem 0.7rem; border-radius: 6px; color: #fff; background: #8b5cf6; font-size: 0.72rem; }.tag-suggestions { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }.tag-suggestions strong { flex-basis: 100%; color: #666a73; font-size: 0.72rem; }.tag-suggestions button { padding: 0.35rem 0.55rem; border: 1px solid #e0e2e5; border-radius: 999px; color: #666a73; background: #fff; font-size: 0.7rem; }.tag-suggestions button.selected { border-color: #c9baf8; color: #7650dc; background: #f2efff; }.dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }.dialog-actions button { padding: 0.45rem 0.65rem; border-radius: 6px; color: #fff; background: #8b5cf6; font-size: 0.7rem; }.dialog-actions .quiet { color: #666a73; background: #fff; }.rewrite-source, .rewrite-diff { display: grid; gap: 0.45rem; padding: 0.75rem; border: 1px solid #e5e6e8; border-radius: 6px; background: #fafafa; color: #555860; font-size: 0.78rem; line-height: 1.55; }.rewrite-source p { margin: 0; white-space: pre-wrap; }.rewrite-diff del { padding: 0.35rem; color: #a33f38; background: #fff1f0; text-decoration: line-through; }.rewrite-diff ins { padding: 0.35rem; color: #236b50; background: #effaf4; text-decoration: none; }
 
 @media (max-width: 700px) {
-  .workspace { grid-template-columns: 1fr; padding: 0.75rem; }
+  .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: 3.5rem minmax(0, 1fr); padding: 0.75rem; }
   .workspace > article { grid-column: 1; grid-row: auto; }
-  .workspace-topbar { grid-template-columns: minmax(0, 1fr); gap: 0.4rem; padding: 0 0.25rem; }
-  .global-search { width: 100%; }
+  .workspace-topbar { gap: 0.4rem; padding: 0 0.25rem; }
+  .mobile-nav-toggle { display: grid; width: 2.2rem; height: 2.2rem; flex: 0 0 auto; place-items: center; border: 1px solid #e0e2e5; border-radius: 7px; color: #555860; background: #fff; }
+  .mobile-nav-toggle:hover { color: #7650dc; border-color: #c9baf8; background: #faf9ff; }
+  .mobile-nav-backdrop { display: block; position: fixed; inset: 0; z-index: 9; width: 100%; height: 100%; border-radius: 0; background: #24252a3d; cursor: default; }
+  .workspace-topbar > .breadcrumbs { display: none; }
+  .global-search { width: auto; flex: 1 1 auto; }
   .global-search-mode span { display: none; }
-  .app-sidebar { margin: 0; min-height: auto; }
+  .editor > header { align-items: center; }
+  .journal-editor-header { margin-bottom: 0.25rem; padding-bottom: 0.25rem; }
+  .editor > header input { width: 100%; min-width: 100%; flex: 0 0 100%; order: -1; }
+  .editor > header .save-status { margin-left: 0; }
+  .journal-editor-header > strong { min-width: 0; flex: 1 1 auto; text-align: center; }
+  .journal-editor-header > .save-status { flex-basis: 100%; }
+  .carry-forward-toggle { display: inline-flex; align-items: center; gap: 0.35rem; margin: 0 1.25rem 1rem; padding: 0.42rem 0.65rem; border: 1px solid #ddd3ff; border-radius: 6px; color: #7650dc; background: #faf9ff; font-size: 0.7rem; }
+  .carry-forward-toggle span { display: inline-grid; min-width: 1.2rem; height: 1.2rem; place-items: center; border-radius: 999px; color: #7650dc; background: #eeeafd; font-size: 0.65rem; }
+  .carry-forward-panel:not(.carry-forward-expanded) { display: none; }
+  .carry-item { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: start; }
+  .assistant-layout { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+  .assistant-history-toggle { display: inline-flex; align-items: center; gap: 0.3rem; }
+  .assistant-history-backdrop { display: block; position: fixed; inset: 0; z-index: 11; width: 100%; height: 100%; border-radius: 0; background: #24252a3d; cursor: default; }
+  .assistant-history { position: fixed; inset: 0 auto 0 0; z-index: 12; width: min(18rem, calc(100vw - 2.5rem)); max-height: none; padding: 1rem 0.75rem; border: 0; border-radius: 0 14px 14px 0; background: #fff; box-shadow: 12px 0 32px #20222b24; transform: translateX(-105%); transition: transform 180ms ease; overflow-y: auto; box-sizing: border-box; }
+  .assistant-history.mobile-history-open { transform: translateX(0); }
+  .workspace > aside.app-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 10; width: min(18rem, calc(100vw - 2.5rem)); min-height: 100dvh; margin: 0; border-radius: 0 14px 14px 0; transform: translateX(-105%); transition: transform 180ms ease; overflow-y: auto; }
+  .workspace > aside.app-sidebar.mobile-nav-open { transform: translateX(0); }
   .sidebar-footer { display: none; }
   .home-view { padding: 1.5rem 0.4rem 2rem; }
   .dashboard-grid { grid-template-columns: 1fr; gap: 1.5rem; }
   .briefing-section { grid-column: auto; }
   .today-section { padding-left: 0; }
-  aside { border-right: 0; border-bottom: 1px solid #d5d4ce; max-height: 14rem; overflow: auto; }
-  .workspace > aside { grid-row: auto; max-height: none; }
   .editor, .tasks, .empty { margin: 1.5rem 0.4rem 2rem; }.tasks { padding-bottom: 1rem; }.tasks > :not(header) { margin-inline: 0.75rem; }.tasks > header { padding-inline: 0.75rem; }
   .settings-form, .platform-settings { grid-template-columns: 1fr; }.platform-settings > div { border-right: 0 !important; }.platform-settings > div:not(:last-child) { border-bottom: 1px solid #ececef; }.platform-settings > div:last-child { border-bottom: 0; }
   .managed-user { grid-template-columns: minmax(0, 1fr) 5.5rem; }.managed-user button { grid-column: 1 / -1; }

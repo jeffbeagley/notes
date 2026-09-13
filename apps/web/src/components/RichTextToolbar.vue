@@ -81,4 +81,7 @@ button { display: grid; width: 2rem; height: 2rem; place-items: center; padding:
 .toolbar-menu { position: relative; }.toolbar-menu > button { display: flex; width: auto; padding: 0 0.28rem; }.toolbar-popover { position: absolute; top: calc(100% + 0.35rem); left: 0; z-index: 3; display: grid; min-width: 9rem; padding: 0.3rem; border: 1px solid #e1e2e5; border-radius: 6px; background: #fff; box-shadow: 0 8px 22px #59616d1a; }.toolbar-popover button { display: flex; gap: 0.45rem; width: 100%; height: auto; justify-content: flex-start; padding: 0.45rem 0.55rem; font-size: 0.72rem; }
 .toolbar-add-group button { display: flex; width: 4.057rem; gap: 0.25rem; padding: 0 0.45rem; font-size: 0.7rem; }.toolbar-add-group input { display: none; }.toolbar-actions { margin-left: auto; }
 :global(.editor-dark) .simple-editor-toolbar { border-color: #34353b; background: #24252a; }:global(.editor-dark) .toolbar-group { border-color: #46474e; }:global(.editor-dark) button { color: #bfc0c7; }:global(.editor-dark) button:hover, :global(.editor-dark) button.active { color: #c4a9ff; background: #343044; }:global(.editor-dark) .toolbar-popover { border-color: #45464d; background: #28292f; }
+@media (max-width: 700px) {
+  .simple-editor-toolbar { box-sizing: border-box; max-width: 100%; flex-wrap: nowrap; overflow-x: auto; }
+}
 </style>
