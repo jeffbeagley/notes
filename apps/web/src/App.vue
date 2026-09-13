@@ -70,7 +70,7 @@
           <button class="note-link" :class="{ active: view === 'unfiled' }" @click="openUnfiled()"><FileText class="nav-icon" :size="15" :stroke-width="1.8" /><span class="nav-label">Unfiled notes</span></button>
           <p v-if="libraryError" class="sidebar-error">{{ libraryError }}</p>
         </div>
-        <div class="sidebar-footer">
+        <div class="sidebar-footer" @click="mobileNavOpen = false">
           <button class="note-link" @click="toggleTheme"><Sun v-if="theme === 'dark'" class="nav-icon" :size="15" :stroke-width="1.8" /><Moon v-else class="nav-icon" :size="15" :stroke-width="1.8" /><span class="nav-label">{{ theme === 'dark' ? 'Light mode' : 'Dark mode' }}</span></button>
           <button class="note-link" :class="{ active: view === 'settings' }" @click="openSettings"><Settings class="nav-icon" :size="15" :stroke-width="1.8" /><span class="nav-label">Settings</span></button>
           <button class="note-link"><HelpCircle class="nav-icon" :size="15" :stroke-width="1.8" /><span class="nav-label">Help Center</span></button>
@@ -2899,7 +2899,10 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
   .assistant-history.mobile-history-open { transform: translateX(0); }
   .workspace > aside.app-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 10; width: min(18rem, calc(100vw - 2.5rem)); min-height: 100dvh; margin: 0; border-radius: 0 14px 14px 0; transform: translateX(-105%); transition: transform 180ms ease; overflow-y: auto; }
   .workspace > aside.app-sidebar.mobile-nav-open { transform: translateX(0); }
-  .sidebar-footer { display: none; }
+  .workspace > aside.app-sidebar.mobile-nav-open { overflow-y: auto; }
+  .workspace > aside.app-sidebar.mobile-nav-open .library-tree { flex: 0 0 auto; min-height: 0; max-height: none; overflow: visible; }
+  .sidebar-footer { display: grid; margin-top: 1rem; }
+  .sidebar-footer { flex: 0 0 auto; }
   .home-view { padding: 1.5rem 0.4rem 2rem; }
   .dashboard-grid { grid-template-columns: 1fr; gap: 1.5rem; }
   .briefing-section { grid-column: auto; }
