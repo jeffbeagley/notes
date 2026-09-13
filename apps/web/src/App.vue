@@ -83,7 +83,7 @@
         <Breadcrumbs :items="breadcrumbs" />
         <form class="global-search" @submit.prevent="submitGlobalSearch">
           <Search :size="16" :stroke-width="1.8" />
-          <input v-model="searchQuery" aria-label="Search your workspace" placeholder="Search your workspace..." @input="updateAutocomplete" @focus="updateAutocomplete" @keydown.esc="autocompleteOpen = false" />
+          <input v-model="searchQuery" aria-label="Search your workspace" placeholder="Search your workspace..." @input="updateAutocomplete" @focus="updateAutocomplete" @blur="handleSearchBlur" @keydown.esc="autocompleteOpen = false" />
           <button type="button" class="global-search-mode" :class="{ active: searchMode === 'llm' }" @click="searchMode = searchMode === 'keyword' ? 'llm' : 'keyword'"><Sparkles v-if="searchMode === 'keyword'" :size="13" :stroke-width="1.8" /><Search v-else :size="13" :stroke-width="1.8" /><span>{{ searchMode === 'llm' ? 'Search' : 'Ask AI' }}</span></button>
           <button type="submit" class="global-search-submit" :disabled="searching"><Search :size="13" :stroke-width="1.8" /><span>{{ searching ? 'Searching...' : 'Search' }}</span></button>
           <div v-if="autocompleteOpen" class="search-autocomplete" role="listbox" aria-label="Search suggestions"><template v-if="autocompleteHits.length"><button v-for="hit in autocompleteHits" :key="`${hit.type}-${hit.id}`" type="button" role="option" @mousedown.prevent="selectAutocompleteHit(hit)"><FileText :size="14" /><span><strong>{{ hit.title || 'Untitled note' }}</strong><small>{{ hit.type }} · {{ hit.date }}</small></span></button></template><div v-else class="search-autocomplete-empty" role="status"><span>No results found</span><button v-if="aiSearchEnabled" type="button" class="search-autocomplete-ai" @mousedown.prevent="askAssistantFromSearch"><Sparkles :size="13" />Ask Assistant</button></div></div>
@@ -1648,6 +1648,15 @@ function updateAutocomplete() {
     autocompleteHits.value = (await response.json() as { hits: SearchHit[] }).hits.slice(0, 6);
     autocompleteOpen.value = true;
   }, 180);
+}
+
+function handleSearchBlur(event: FocusEvent) {
+  const searchForm = event.currentTarget instanceof HTMLInputElement ? event.currentTarget.form : null;
+  window.setTimeout(() => {
+    if (!searchForm?.contains(document.activeElement)) {
+      autocompleteOpen.value = false;
+    }
+  }, 0);
 }
 
 async function selectAutocompleteHit(hit: SearchHit) {
