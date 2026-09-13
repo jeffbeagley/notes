@@ -231,6 +231,21 @@ The chart then builds `DATABASE_URL` and `REDIS_URL` for you and ignores `secret
 this project's control, and neither is configured for backup or high availability. Use a managed
 database in production.
 
+**NFS-backed storage classes and `fsGroup`**: some NFS CSI drivers/provisioners never chown the
+volume to match a pod's `fsGroup`, so the postgresql/redis data directories stay root-owned and the
+containers (running as non-root) fail to write to them — postgresql exits silently right after
+"Generating local authentication configuration" with no further log output. If your PVCs are on
+NFS, enable each subchart's root init container to fix ownership on mount:
+
+```yaml
+postgresql:
+  volumePermissions:
+    enabled: true
+redis:
+  volumePermissions:
+    enabled: true
+```
+
 ## Upgrading
 
 ```sh

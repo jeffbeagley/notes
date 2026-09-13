@@ -154,6 +154,9 @@ postgresql:
       enabled: true
       size: 8Gi
       storageClass: ""
+    ## The subchart's default "nano" preset (128Mi/192Mi) OOM-kills postgres during initdb with
+    ## pgaudit preloaded. "small" is required for a working first install.
+    resourcesPreset: small
 
 redis:
   enabled: false
@@ -166,6 +169,8 @@ redis:
       enabled: true
       size: 8Gi
       storageClass: ""
+    ## Same "nano" preset concern as postgresql above, with more headroom.
+    resourcesPreset: micro
 
 ## Uploaded images. ReadWriteOnce is sufficient for a single API replica; scaling api.replicas
 ## above 1 requires a ReadWriteMany storage class.

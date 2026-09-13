@@ -50,6 +50,9 @@ spec:
               mountPath: /var/run
             - name: nginx-conf
               mountPath: /etc/nginx/conf.d
+            # Base image's nginx.conf puts pid + proxy/client/fastcgi/uwsgi/scgi temp paths under /tmp.
+            - name: tmp
+              mountPath: /tmp
           resources:
             {{- toYaml .Values.web.resources | nindent 12 }}
           readinessProbe:
@@ -64,6 +67,8 @@ spec:
         - name: nginx-run
           emptyDir: {}
         - name: nginx-conf
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}
       {{- with .Values.web.nodeSelector }}
       nodeSelector:
