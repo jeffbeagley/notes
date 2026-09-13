@@ -2844,6 +2844,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .carry-forward-panel { padding: 1rem; border: 1px solid #ddd3ff; border-radius: 9px; background: #faf9ff; margin-bottom: 1rem; margin: 1.25rem clamp(1.25rem, 4vw, 3.5rem) 1rem; }
 .carry-forward-panel h3 { margin: 0 0 0.5rem; color: #7650dc; font-size: 0.78rem; font-family: inherit; }
 .carry-forward-toggle { display: none; }
+.assistant-composer textarea { box-sizing: border-box; width: 100%; min-width: 0; min-height: 2.45rem; max-height: 12rem; flex: 1; padding: 0.5rem 0.6rem; border: 0; outline: 0; resize: vertical; background: transparent; color: #34363b; font-size: 0.8rem; line-height: 1.45; }
 .carry-item { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid #f2e2dc; border-bottom-color: #eeeafd; font-size: 0.78rem; }
 .briefing-content { padding: 1.35rem; background: #fff; border: 1px solid #e3e4e7; border-radius: 9px; line-height: 1.75; margin: 1.5rem clamp(1.25rem, 4vw, 3.5rem) 0; color: #4b4d54; font-size: 0.88rem; box-shadow: 0 5px 18px #59616d0a; }
 .empty { margin-top: 20vh; padding: 5rem 2rem; width: auto; margin: 2.5rem 3.5rem 3rem; text-align: center; }

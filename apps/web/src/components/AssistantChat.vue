@@ -57,7 +57,7 @@
       <div ref="scrollAnchor" />
     </div>
     <form class="assistant-composer" @submit.prevent="emit('submit')">
-      <input :value="prompt" :aria-label="inputLabel" :placeholder="placeholder" :disabled="sending" @input="emit('update:prompt', ($event.target as HTMLInputElement).value)" />
+      <textarea :value="prompt" :aria-label="inputLabel" :placeholder="placeholder" :disabled="sending" rows="2" @input="emit('update:prompt', ($event.target as HTMLTextAreaElement).value)" />
       <button type="submit" title="Send message" :disabled="sending || !prompt.trim()"><Send :size="16" /></button>
     </form>
   </div>
