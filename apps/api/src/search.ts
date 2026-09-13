@@ -227,6 +227,28 @@ async function streamChatOnce(config: Awaited<ReturnType<typeof getLlmConfig>>, 
   return { content, toolCalls, finishReason };
 }
 
+/// Best-effort follow-up chips shown under the assistant's answer, similar to the suggested-next-question
+/// UX in ChatGPT/Claude web. Never throws: a failure here should not affect the actual answer.
+async function generateFollowUps(prisma: PrismaClient, question: string, answer: string): Promise<string[] | null> {
+  if (!answer.trim()) return null;
+  try {
+    const raw = await callLlm(prisma, [
+      {
+        role: 'system',
+        content: 'Suggest up to 3 short, natural follow-up questions the user might want to ask next about their notes, journals, or tasks, based on the exchange below. Return JSON: {"suggestions": ["...", "...", "..."]}. Each suggestion is a complete question under 9 words, phrased as the user would ask it. Do not repeat the question already asked. If nothing sensible follows, return an empty array.',
+      },
+      { role: 'user', content: `Question: ${question}\n\nAnswer: ${answer.slice(0, 1200)}` },
+    ], { responseFormatJson: true });
+    const parsed = JSON.parse(raw) as { suggestions?: unknown };
+    const suggestions = Array.isArray(parsed.suggestions)
+      ? parsed.suggestions.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).map((item) => item.trim().slice(0, 140)).slice(0, 3)
+      : [];
+    return suggestions.length ? suggestions : null;
+  } catch {
+    return null;
+  }
+}
+
 export function registerSearchRoutes(app: FastifyInstance, prisma: PrismaClient) {
   app.get('/api/v1/assistant/conversations', async (request, reply) => {
     const user = await requireUser(request, reply, prisma);
@@ -238,6 +260,42 @@ export function registerSearchRoutes(app: FastifyInstance, prisma: PrismaClient)
       take: 100,
     });
     return { conversations };
+  });
+
+  app.get<{ Querystring: { mode?: AssistantMode; noteId?: string; journalDate?: string } }>('/api/v1/assistant/starters', async (request, reply) => {
+    const user = await requireUser(request, reply, prisma);
+    if (!user) return;
+    const mode: AssistantMode = request.query.mode === 'journal' || request.query.mode === 'note' ? request.query.mode : 'workspace';
+
+    if (mode === 'note') {
+      const note = request.query.noteId ? await prisma.note.findFirst({ where: { id: request.query.noteId, userId: user.id, type: 'note' } }) : null;
+      if (!note) return { suggestions: [] };
+      const suggestions = ['Summarize this note', 'Extract action items from this note'];
+      if (note.bodyMarkdown.trim().length > 400) suggestions.push('Clean up the formatting in this note');
+      suggestions.push('Turn this into a checklist');
+      return { suggestions: suggestions.slice(0, 3) };
+    }
+
+    if (mode === 'journal') {
+      const dateKey = request.query.journalDate && /^\d{4}-\d{2}-\d{2}$/.test(request.query.journalDate) ? request.query.journalDate : localDate(user.timezone);
+      const journal = await prisma.journal.findUnique({ where: { userId_journalDate: { userId: user.id, journalDate: new Date(`${dateKey}T00:00:00Z`) } } });
+      const suggestions = journal?.bodyMarkdown.trim()
+        ? ['Summarize today\'s entry', 'Turn today\'s entry into tasks', 'What did I do yesterday?']
+        : ['Help me start today\'s journal', 'What did I do yesterday?', 'What are my open tasks?'];
+      return { suggestions };
+    }
+
+    const [openTaskCount, recentNote, todaysJournal] = await Promise.all([
+      prisma.task.count({ where: { userId: user.id, status: { in: ['todo', 'doing'] } } }),
+      prisma.note.findFirst({ where: { userId: user.id, type: 'note' }, orderBy: { updatedAt: 'desc' }, select: { title: true } }),
+      prisma.journal.findUnique({ where: { userId_journalDate: { userId: user.id, journalDate: new Date(`${localDate(user.timezone)}T00:00:00Z`) } } }),
+    ]);
+    const suggestions: string[] = [];
+    if (openTaskCount > 0) suggestions.push(`What are my ${openTaskCount} open tasks?`);
+    if (recentNote?.title) suggestions.push(`Summarize "${recentNote.title}"`);
+    suggestions.push(todaysJournal?.bodyMarkdown.trim() ? 'What did I write in today\'s journal?' : 'Help me start today\'s journal');
+    suggestions.push('Summarize my week');
+    return { suggestions: suggestions.slice(0, 4) };
   });
 
   app.get<{ Params: { id: string } }>('/api/v1/assistant/conversations/:id', async (request, reply) => {
@@ -394,6 +452,8 @@ export function registerSearchRoutes(app: FastifyInstance, prisma: PrismaClient)
           seen.add(key);
           return true;
         })];
+        const suggestions = !pendingChoices ? await generateFollowUps(prisma, question, finalContent) : null;
+        if (suggestions) reply.raw.write(`data: ${JSON.stringify({ suggestions })}\n\n`);
         await prisma.assistantMessage.create({
           data: {
             conversationId: conversation.id,
@@ -402,6 +462,7 @@ export function registerSearchRoutes(app: FastifyInstance, prisma: PrismaClient)
             sources: allSources as unknown as Prisma.InputJsonValue,
             toolCalls: persistedToolCalls.length ? (persistedToolCalls as unknown as Prisma.InputJsonValue) : undefined,
             choices: pendingChoices ? (pendingChoices as unknown as Prisma.InputJsonValue) : undefined,
+            suggestions: suggestions ? (suggestions as unknown as Prisma.InputJsonValue) : undefined,
           },
         });
         await prisma.assistantConversation.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } });

@@ -1,6 +1,15 @@
 <template>
   <div class="assistant-main">
-    <div v-if="!messages.length" class="assistant-empty"><Sparkles :size="19" /><p>{{ emptyText }}</p></div>
+    <div v-if="!messages.length" class="assistant-empty">
+      <Sparkles :size="19" />
+      <p>{{ emptyText }}</p>
+      <div v-if="starterSuggestions?.length" class="assistant-starters">
+        <button v-for="starter in starterSuggestions" :key="starter" type="button" class="assistant-choice assistant-starter" @click="emit('suggestion-click', starter)">
+          <Lightbulb :size="13" />
+          <span class="assistant-choice-label">{{ starter }}</span>
+        </button>
+      </div>
+    </div>
     <div v-else class="assistant-messages">
       <section v-for="(message, index) in messages" :key="message.id" class="assistant-message" :class="message.role">
         <div class="assistant-message-body">
@@ -38,6 +47,12 @@
                 </button>
               </div>
               <p v-if="message.chosenLabel" class="assistant-choices-answered">You chose “{{ message.chosenLabel }}”.</p>
+              <p v-else class="assistant-choices-hint">Or type your own answer below.</p>
+            </div>
+            <div v-else-if="message.suggestions?.length && index === messages.length - 1 && !sending" class="assistant-followups">
+              <button v-for="suggestion in message.suggestions" :key="suggestion" type="button" class="assistant-choice assistant-followup" @click="emit('suggestion-click', suggestion)">
+                <span class="assistant-choice-label">{{ suggestion }}</span>
+              </button>
             </div>
           </template>
         </div>
@@ -64,13 +79,13 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowUpRight, Check, CheckCircle2, Copy, Loader2, Pencil, RotateCcw, Send, Sparkles } from '@lucide/vue';
+import { ArrowUpRight, Check, CheckCircle2, Copy, Lightbulb, Loader2, Pencil, RotateCcw, Send, Sparkles } from '@lucide/vue';
 
 export type AssistantSearchHit = { id: string; type: 'note' | 'journal' | 'task' | 'summary'; title: string; snippet: string; date: string; periodKey?: string };
 export type AssistantToolCall = { name: string; args: Record<string, unknown>; status: 'running' | 'done'; summary?: string; ok?: boolean; source?: AssistantSearchHit };
 export type AssistantChoiceOption = { label: string; value: string; hint?: string };
 export type AssistantChoices = { question: string; options: AssistantChoiceOption[] };
-export type AssistantMessage = { id: string; role: 'user' | 'assistant'; content: string; sources?: AssistantSearchHit[]; toolCalls?: AssistantToolCall[]; choices?: AssistantChoices; chosenLabel?: string };
+export type AssistantMessage = { id: string; role: 'user' | 'assistant'; content: string; sources?: AssistantSearchHit[]; toolCalls?: AssistantToolCall[]; choices?: AssistantChoices; chosenLabel?: string; suggestions?: string[] };
 
 defineProps<{
   messages: AssistantMessage[];
@@ -80,6 +95,7 @@ defineProps<{
   emptyText: string;
   placeholder: string;
   inputLabel: string;
+  starterSuggestions?: string[];
   renderContent: (message: AssistantMessage) => string;
   toolLabel: (call: AssistantToolCall) => string;
   isChoicePending: (message: AssistantMessage, index: number) => boolean;
@@ -92,6 +108,7 @@ const emit = defineEmits<{
   edit: [message: AssistantMessage, index: number];
   resend: [message: AssistantMessage, index: number];
   choose: [message: AssistantMessage, option: AssistantChoiceOption];
+  'suggestion-click': [suggestion: string];
   'source-click': [source: AssistantSearchHit];
   'link-click': [event: MouseEvent, message: AssistantMessage];
 }>();

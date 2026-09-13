@@ -354,6 +354,7 @@ model AssistantMessage {
   sources        Json?
   toolCalls      Json?
   choices        Json?
+  suggestions    Json?
   createdAt      DateTime              @default(now())
   conversation   AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 

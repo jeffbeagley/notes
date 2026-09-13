@@ -300,7 +300,7 @@
               <span><Sparkles :size="17" /><strong id="note-assistant-title">Note Assistant</strong></span>
               <div><button class="quiet" type="button" @click="clearNoteAssistant">New chat</button><button class="quiet icon-only" type="button" title="Close note assistant" @click="noteAssistantOpen = false"><X :size="16" /></button></div>
             </header>
-            <AssistantChat v-model:scroll-anchor="noteAssistantScrollAnchor" v-model:prompt="noteAssistantPrompt" :messages="noteAssistantMessages" :sending="noteAssistantSending" :copied-message-id="copiedMessageId" empty-text="Tell me what to add or turn into a task." placeholder="Add a task or note here" input-label="Ask Note Assistant" :render-content="renderAssistantContent" :tool-label="toolLabel" :is-choice-pending="isNoteChoicePending" @submit="sendNoteAssistantMessage()" @copy="copyAssistantMessage" @edit="editAndResendNoteAssistantMessage" @resend="resendNoteAssistantMessage" @choose="pickNoteAssistantChoice" @source-click="openHit" @link-click="handleAssistantLinkClick" />
+            <AssistantChat v-model:scroll-anchor="noteAssistantScrollAnchor" v-model:prompt="noteAssistantPrompt" :messages="noteAssistantMessages" :sending="noteAssistantSending" :copied-message-id="copiedMessageId" empty-text="Tell me what to add or turn into a task." placeholder="Add a task or note here" input-label="Ask Note Assistant" :starter-suggestions="noteAssistantStarters" :render-content="renderAssistantContent" :tool-label="toolLabel" :is-choice-pending="isNoteChoicePending" @submit="sendNoteAssistantMessage()" @copy="copyAssistantMessage" @edit="editAndResendNoteAssistantMessage" @resend="resendNoteAssistantMessage" @choose="pickNoteAssistantChoice" @suggestion-click="pickNoteAssistantSuggestion" @source-click="openHit" @link-click="handleAssistantLinkClick" />
           </aside>
         </div>
         <aside v-if="versionsOpen" class="versions"><header><h2>Version history</h2><button title="Close version history" @click="versionsOpen = false">Close</button></header><p v-if="!versions.length">No saved versions yet.</p><div v-for="item in versions" :key="item.id" class="version"><span>v{{ item.versionN }} · {{ item.source }} · {{ new Date(item.createdAt).toLocaleString() }}</span><button @click="restoreVersion(item.id)">Restore</button></div></aside>
@@ -333,7 +333,7 @@
               <span><Sparkles :size="17" /><strong id="journal-assistant-title">Journal Assistant</strong></span>
               <div><button class="quiet" type="button" @click="clearJournalAssistant">New chat</button><button class="quiet icon-only" type="button" title="Close journal assistant" @click="journalAssistantOpen = false"><X :size="16" /></button></div>
             </header>
-            <AssistantChat v-model:scroll-anchor="journalAssistantScrollAnchor" v-model:prompt="journalAssistantPrompt" :messages="journalAssistantMessages" :sending="journalAssistantSending" :copied-message-id="copiedMessageId" empty-text="Tell me what to add or turn into a task." placeholder="Add a task or note to this journal" input-label="Ask Journal Assistant" :render-content="renderAssistantContent" :tool-label="toolLabel" :is-choice-pending="isJournalChoicePending" @submit="sendJournalAssistantMessage()" @copy="copyAssistantMessage" @edit="editAndResendJournalAssistantMessage" @resend="resendJournalAssistantMessage" @choose="pickJournalAssistantChoice" @source-click="openHit" @link-click="handleAssistantLinkClick" />
+            <AssistantChat v-model:scroll-anchor="journalAssistantScrollAnchor" v-model:prompt="journalAssistantPrompt" :messages="journalAssistantMessages" :sending="journalAssistantSending" :copied-message-id="copiedMessageId" empty-text="Tell me what to add or turn into a task." placeholder="Add a task or note to this journal" input-label="Ask Journal Assistant" :starter-suggestions="journalAssistantStarters" :render-content="renderAssistantContent" :tool-label="toolLabel" :is-choice-pending="isJournalChoicePending" @submit="sendJournalAssistantMessage()" @copy="copyAssistantMessage" @edit="editAndResendJournalAssistantMessage" @resend="resendJournalAssistantMessage" @choose="pickJournalAssistantChoice" @suggestion-click="pickJournalAssistantSuggestion" @source-click="openHit" @link-click="handleAssistantLinkClick" />
           </aside>
         </div>
         <aside v-if="versionsOpen" class="versions"><header><h2>Version history</h2><button title="Close version history" @click="versionsOpen = false">Close</button></header><p v-if="!versions.length">No saved versions yet.</p><div v-for="item in versions" :key="item.id" class="version"><span>v{{ item.versionN }} · {{ item.source }} · {{ new Date(item.createdAt).toLocaleString() }}</span><button @click="restoreVersion(item.id)">Restore</button></div></aside>
@@ -404,7 +404,7 @@
               <button type="button" class="assistant-history-delete" title="Delete conversation" @click="deleteConversation(conversation.id, $event)"><Trash2 :size="13" /></button>
             </div>
           </aside>
-          <AssistantChat v-model:scroll-anchor="assistantScrollAnchor" v-model:prompt="assistantPrompt" :messages="assistantMessages" :sending="assistantSending" :copied-message-id="copiedMessageId" empty-text="Ask about your notes, journals, or tasks." placeholder="Ask anything about your workspace" input-label="Ask Assistant" :render-content="renderAssistantContent" :tool-label="toolLabel" :is-choice-pending="isChoicePending" @submit="sendAssistantMessage()" @copy="copyAssistantMessage" @edit="editAndResendAssistantMessage" @resend="resendAssistantMessage" @choose="pickAssistantChoice" @source-click="openHit" @link-click="handleAssistantLinkClick" />
+          <AssistantChat v-model:scroll-anchor="assistantScrollAnchor" v-model:prompt="assistantPrompt" :messages="assistantMessages" :sending="assistantSending" :copied-message-id="copiedMessageId" empty-text="Ask about your notes, journals, or tasks." placeholder="Ask anything about your workspace" input-label="Ask Assistant" :starter-suggestions="assistantStarters" :render-content="renderAssistantContent" :tool-label="toolLabel" :is-choice-pending="isChoicePending" @submit="sendAssistantMessage()" @copy="copyAssistantMessage" @edit="editAndResendAssistantMessage" @resend="resendAssistantMessage" @choose="pickAssistantChoice" @suggestion-click="pickAssistantSuggestion" @source-click="openHit" @link-click="handleAssistantLinkClick" />
         </div>
       </article>
       <article v-else-if="view === 'settings'" class="tasks settings-view">
@@ -566,6 +566,7 @@ const assistantSending = ref(false);
 const assistantRoutePrompt = ref('');
 const assistantScrollAnchor = ref<HTMLElement | null>(null);
 const assistantConversations = ref<AssistantConversationSummary[]>([]);
+const assistantStarters = ref<string[]>([]);
 const activeConversationId = ref<string | null>(null);
 const loadingConversation = ref(false);
 const copiedMessageId = ref<string | null>(null);
@@ -576,16 +577,37 @@ const noteAssistantSending = ref(false);
 const noteAssistantConversationId = ref<string | null>(null);
 const noteAssistantNoteId = ref<string | null>(null);
 const noteAssistantScrollAnchor = ref<HTMLElement | null>(null);
+const noteAssistantStarters = ref<string[]>([]);
 const journalAssistantOpen = ref(false);
 const journalAssistantMessages = ref<AssistantMessage[]>([]);
 const journalAssistantPrompt = ref('');
 const journalAssistantSending = ref(false);
 const journalAssistantConversationId = ref<string | null>(null);
 const journalAssistantScrollAnchor = ref<HTMLElement | null>(null);
+const journalAssistantStarters = ref<string[]>([]);
 
 function createAssistantMessageId() {
   return globalThis.crypto?.randomUUID?.() ?? `assistant-message-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
+
+async function fetchAssistantStarters(mode: 'workspace' | 'note' | 'journal', extra: Record<string, string> = {}): Promise<string[]> {
+  try {
+    const params = new URLSearchParams({ mode, ...extra });
+    const response = await fetch(`/api/v1/assistant/starters?${params}`, { credentials: 'include' });
+    if (!response.ok) return [];
+    return (await response.json() as { suggestions: string[] }).suggestions ?? [];
+  } catch {
+    return [];
+  }
+}
+
+watch(noteAssistantOpen, async (open) => {
+  if (open && activeNote.value) noteAssistantStarters.value = await fetchAssistantStarters('note', { noteId: activeNote.value.id });
+});
+
+watch(journalAssistantOpen, async (open) => {
+  if (open) journalAssistantStarters.value = await fetchAssistantStarters('journal', { journalDate: journal.value ? journal.value.journalDate.slice(0, 10) : '' });
+});
 
 async function scrollAssistantToBottom() {
   await nextTick();
@@ -1411,6 +1433,7 @@ async function syncRoute() {
     journal.value = null;
     view.value = 'assistant';
     void loadAssistantConversations();
+    if (!assistantMessages.value.length) void fetchAssistantStarters('workspace').then((suggestions) => { assistantStarters.value = suggestions; });
     const prompt = typeof route.query.q === 'string' ? route.query.q : '';
     if (prompt && prompt !== assistantRoutePrompt.value) {
       assistantRoutePrompt.value = prompt;
@@ -1700,6 +1723,7 @@ async function openAssistant(prompt: string = '') {
   journal.value = null;
   view.value = 'assistant';
   void loadAssistantConversations();
+  if (!assistantMessages.value.length) void fetchAssistantStarters('workspace').then((suggestions) => { assistantStarters.value = suggestions; });
   await router.push({ name: 'assistant', query: prompt ? { q: prompt } : {} });
 }
 
@@ -1708,6 +1732,7 @@ function clearAssistant() {
   assistantPrompt.value = '';
   assistantRoutePrompt.value = '';
   activeConversationId.value = null;
+  void fetchAssistantStarters('workspace').then((suggestions) => { assistantStarters.value = suggestions; });
   void router.replace({ name: 'assistant' });
 }
 
@@ -1728,7 +1753,7 @@ async function openConversation(id: string) {
   try {
     const response = await fetch(`/api/v1/assistant/conversations/${id}`, { credentials: 'include' });
     if (!response.ok) return;
-    const body = await response.json() as { messages: { id: string; role: 'user' | 'assistant'; content: string; sources: SearchHit[] | null; toolCalls: unknown; choices: AssistantChoices | null }[] };
+    const body = await response.json() as { messages: { id: string; role: 'user' | 'assistant'; content: string; sources: SearchHit[] | null; toolCalls: unknown; choices: AssistantChoices | null; suggestions: string[] | null }[] };
     assistantMessages.value = body.messages.map((message) => ({
       id: message.id,
       role: message.role,
@@ -1736,6 +1761,7 @@ async function openConversation(id: string) {
       sources: message.sources ?? undefined,
       toolCalls: mapStoredToolCalls(message.toolCalls),
       choices: message.choices ?? undefined,
+      suggestions: message.suggestions ?? undefined,
     }));
     activeConversationId.value = id;
     assistantPrompt.value = '';
@@ -1787,12 +1813,13 @@ async function sendAssistantStreamMessage(options: AssistantStreamOptions) {
       buffer = lines.pop() ?? '';
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
-        const event = JSON.parse(line.slice(6)) as { conversationId?: string; delta?: string; sources?: SearchHit[]; error?: string; choices?: AssistantChoices; toolCall?: { name: string; args: Record<string, unknown> }; toolResult?: { name: string; ok: boolean; summary: string; source?: SearchHit; refresh?: 'notes' | 'tasks' | 'journals' } };
+        const event = JSON.parse(line.slice(6)) as { conversationId?: string; delta?: string; sources?: SearchHit[]; error?: string; choices?: AssistantChoices; suggestions?: string[]; toolCall?: { name: string; args: Record<string, unknown> }; toolResult?: { name: string; ok: boolean; summary: string; source?: SearchHit; refresh?: 'notes' | 'tasks' | 'journals' } };
         const message = options.messages.value[assistantIndex];
         if (event.conversationId) options.conversationIdRef.value = event.conversationId;
         if (event.sources) message.sources = event.sources;
         if (event.delta) message.content += event.delta;
         if (event.choices) message.choices = event.choices;
+        if (event.suggestions) message.suggestions = event.suggestions;
         if (event.toolCall) message.toolCalls = [...(message.toolCalls ?? []), { name: event.toolCall.name, args: event.toolCall.args, status: 'running' }];
         if (event.toolResult) {
           const calls = message.toolCalls ?? [];
@@ -1854,6 +1881,11 @@ function pickAssistantChoice(message: AssistantMessage, option: AssistantChoiceO
   void sendAssistantMessage(option.value);
 }
 
+function pickAssistantSuggestion(suggestion: string) {
+  if (assistantSending.value) return;
+  void sendAssistantMessage(suggestion);
+}
+
 function resetNoteAssistantForNote(noteId: string | null) {
   if (noteAssistantNoteId.value === noteId) return;
   noteAssistantOpen.value = false;
@@ -1908,6 +1940,11 @@ function pickNoteAssistantChoice(message: AssistantMessage, option: AssistantCho
   void sendNoteAssistantMessage(option.value);
 }
 
+function pickNoteAssistantSuggestion(suggestion: string) {
+  if (noteAssistantSending.value) return;
+  void sendNoteAssistantMessage(suggestion);
+}
+
 async function sendJournalAssistantMessage(prompt = journalAssistantPrompt.value.trim()) {
   const date = journal.value?.journalDate.slice(0, 10);
   await saveJournal();
@@ -1948,6 +1985,11 @@ function pickJournalAssistantChoice(message: AssistantMessage, option: Assistant
   if (journalAssistantSending.value) return;
   message.chosenLabel = option.label;
   void sendJournalAssistantMessage(option.value);
+}
+
+function pickJournalAssistantSuggestion(suggestion: string) {
+  if (journalAssistantSending.value) return;
+  void sendJournalAssistantMessage(suggestion);
 }
 
 const TOOL_LABELS: Record<string, string> = {  search_notes: 'Searching notes',
@@ -2829,7 +2871,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .search-result { display: block; width: 100%; padding: 0.85rem 0.9rem; border: 1px solid #e5e6e8; border-bottom: 0; color: #45474e; background: #fff; text-align: left; }
 .search-result:first-of-type { border-radius: 9px 9px 0 0; }.search-result:last-of-type { border-bottom: 1px solid #e5e6e8; border-radius: 0 0 9px 9px; }
 .search-result:only-of-type { border-radius: 9px; }.search-result:hover { border-color: #ddd3ff; background: #faf9ff; }.search-result strong { display: block; font-size: 0.78rem; }.search-result p { margin: 0.35rem 0 0 !important; color: #858991; font-size: 0.74rem; line-height: 1.55; }
-.assistant-view { display: flex; min-height: 34rem; flex-direction: column; }.assistant-layout { display: grid; grid-template-columns: 15rem minmax(0, 1fr); flex: 1; gap: 1.5rem; min-height: 0; }.assistant-history { display: grid; align-content: start; gap: 0.4rem; max-height: calc(100vh - 14rem); padding-right: 0.2rem; overflow-y: auto; }.assistant-history-item { display: flex; gap: 0.4rem; align-items: center; justify-content: space-between; padding: 0.55rem 0.65rem; border: 1px solid #e5e6e8; border-radius: 7px; background: #fff; cursor: pointer; }.assistant-history-item:hover { border-color: #ddd3ff; background: #faf9ff; }.assistant-history-item.active { border-color: #c9baf8; background: #f2efff; }.assistant-history-text { display: grid; min-width: 0; gap: 0.15rem; }.assistant-history-text strong { overflow: hidden; color: #313238; font-size: 0.78rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }.assistant-history-text small { color: #92959c; font-size: 0.68rem; }.assistant-history-delete { display: grid; flex: 0 0 auto; width: 1.5rem; height: 1.5rem; place-items: center; padding: 0; border-radius: 5px; color: #a0a2a8; background: transparent; }.assistant-history-delete:hover { color: #b64b42; background: #fbeceb; }.assistant-main { display: flex; min-width: 0; flex-direction: column; }.assistant-empty { display: grid; min-height: 20rem; place-content: center; justify-items: center; gap: 0.55rem; color: #a0a2a8; text-align: center; }.assistant-empty svg { color: #8255ec; }.assistant-empty p { margin: 0; font-size: 0.82rem; }.assistant-messages { display: grid; gap: 0.85rem; max-width: 48rem; margin-bottom: 1rem !important; }.assistant-message { width: fit-content; max-width: min(100%, 42rem); padding: 0.7rem 0.85rem; border-radius: 8px; color: #4b4d54; background: #f6f6f7; font-size: 0.82rem; line-height: 1.6; }.assistant-message.user { justify-self: end; color: #fff; background: #8b5cf6; }.assistant-message p { margin: 0; white-space: pre-wrap; }.assistant-markdown > :first-child { margin-top: 0; }.assistant-markdown > :last-child { margin-bottom: 0; }.assistant-markdown p { margin: 0.45rem 0; }.assistant-markdown pre { overflow-x: auto; padding: 0.65rem; border-radius: 6px; background: #262733; color: #f5f5f7; }.assistant-markdown code { font-family: ui-monospace, monospace; }.assistant-markdown li + li { margin-top: 0.2rem; }.assistant-message small { display: block; margin-top: 0.55rem; color: #92959c; font-size: 0.66rem; line-height: 1.45; }.assistant-message.user small { color: #eee9ff; }.assistant-thinking { color: #92959c; font-size: 0.74rem; }.assistant-markdown a[href^="assistant-source:"] { color: #7650dc; font-weight: 600; text-decoration: none; border-bottom: 1px dashed #c4a9ff; cursor: pointer; }.assistant-markdown a[href^="assistant-source:"]:hover { color: #5a2fc2; border-bottom-style: solid; }.assistant-tool-calls { display: grid; gap: 0.3rem; margin-bottom: 0.5rem; }.assistant-tool-call { display: inline-flex; width: fit-content; gap: 0.35rem; align-items: center; padding: 0.25rem 0.55rem; border-radius: 999px; color: #7650dc; background: #f2efff; font-size: 0.68rem; }.assistant-tool-call.running { color: #92959c; background: #eceef0; }.assistant-tool-call.failed { color: #b64b42; background: #fbeceb; }.assistant-tool-call.linkable { cursor: pointer; }.assistant-tool-call.linkable:hover { background: #e4dbff; }.assistant-tool-call .spin { animation: assistant-spin 0.9s linear infinite; }@keyframes assistant-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }.assistant-composer { display: flex; position: sticky; bottom: 1rem; gap: 0.5rem; align-items: center; margin-top: auto !important; padding: 0.55rem; border: 1px solid #e3e4e7; border-radius: 9px; background: #fff; box-shadow: 0 5px 18px #59616d0a; z-index: 3; }.assistant-composer input { min-width: 0; flex: 1; padding: 0.5rem 0.6rem; border: 0; background: transparent; color: #34363b; font-size: 0.8rem; }.assistant-composer button { display: grid; width: 2rem; height: 2rem; place-items: center; padding: 0; border-radius: 6px; color: #fff; background: #8b5cf6; }.assistant-composer button:hover { background: #7650dc; }.assistant-composer button:disabled { cursor: wait; opacity: 0.6; }
+.assistant-view { display: flex; min-height: 34rem; flex-direction: column; }.assistant-layout { display: grid; grid-template-columns: 15rem minmax(0, 1fr); flex: 1; gap: 1.5rem; min-height: 0; }.assistant-history { display: grid; align-content: start; gap: 0.4rem; max-height: calc(100vh - 14rem); padding-right: 0.2rem; overflow-y: auto; }.assistant-history-item { display: flex; gap: 0.4rem; align-items: center; justify-content: space-between; padding: 0.55rem 0.65rem; border: 1px solid #e5e6e8; border-radius: 7px; background: #fff; cursor: pointer; }.assistant-history-item:hover { border-color: #ddd3ff; background: #faf9ff; }.assistant-history-item.active { border-color: #c9baf8; background: #f2efff; }.assistant-history-text { display: grid; min-width: 0; gap: 0.15rem; }.assistant-history-text strong { overflow: hidden; color: #313238; font-size: 0.78rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }.assistant-history-text small { color: #92959c; font-size: 0.68rem; }.assistant-history-delete { display: grid; flex: 0 0 auto; width: 1.5rem; height: 1.5rem; place-items: center; padding: 0; border-radius: 5px; color: #a0a2a8; background: transparent; }.assistant-history-delete:hover { color: #b64b42; background: #fbeceb; }.assistant-main { display: flex; min-width: 0; flex-direction: column; }.assistant-empty { display: grid; min-height: 20rem; place-content: center; justify-items: center; gap: 0.55rem; color: #a0a2a8; text-align: center; }.assistant-empty svg { color: #8255ec; }.assistant-empty p { margin: 0; font-size: 0.82rem; }.assistant-starters { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.45rem; margin-top: 0.4rem; max-width: 30rem; }.assistant-starter { display: flex; align-items: center; gap: 0.4rem; }.assistant-starter svg { flex: 0 0 auto; color: #8255ec; }.assistant-followups { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }.assistant-choices-hint { margin: 0; color: #9a9ea8; font-size: 0.68rem; font-style: italic; }.assistant-messages { display: grid; gap: 0.85rem; max-width: 48rem; margin-bottom: 1rem !important; }.assistant-message { width: fit-content; max-width: min(100%, 42rem); padding: 0.7rem 0.85rem; border-radius: 8px; color: #4b4d54; background: #f6f6f7; font-size: 0.82rem; line-height: 1.6; }.assistant-message.user { justify-self: end; color: #fff; background: #8b5cf6; }.assistant-message p { margin: 0; white-space: pre-wrap; }.assistant-markdown > :first-child { margin-top: 0; }.assistant-markdown > :last-child { margin-bottom: 0; }.assistant-markdown p { margin: 0.45rem 0; }.assistant-markdown pre { overflow-x: auto; padding: 0.65rem; border-radius: 6px; background: #262733; color: #f5f5f7; }.assistant-markdown code { font-family: ui-monospace, monospace; }.assistant-markdown li + li { margin-top: 0.2rem; }.assistant-message small { display: block; margin-top: 0.55rem; color: #92959c; font-size: 0.66rem; line-height: 1.45; }.assistant-message.user small { color: #eee9ff; }.assistant-thinking { color: #92959c; font-size: 0.74rem; }.assistant-markdown a[href^="assistant-source:"] { color: #7650dc; font-weight: 600; text-decoration: none; border-bottom: 1px dashed #c4a9ff; cursor: pointer; }.assistant-markdown a[href^="assistant-source:"]:hover { color: #5a2fc2; border-bottom-style: solid; }.assistant-tool-calls { display: grid; gap: 0.3rem; margin-bottom: 0.5rem; }.assistant-tool-call { display: inline-flex; width: fit-content; gap: 0.35rem; align-items: center; padding: 0.25rem 0.55rem; border-radius: 999px; color: #7650dc; background: #f2efff; font-size: 0.68rem; }.assistant-tool-call.running { color: #92959c; background: #eceef0; }.assistant-tool-call.failed { color: #b64b42; background: #fbeceb; }.assistant-tool-call.linkable { cursor: pointer; }.assistant-tool-call.linkable:hover { background: #e4dbff; }.assistant-tool-call .spin { animation: assistant-spin 0.9s linear infinite; }@keyframes assistant-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }.assistant-composer { display: flex; position: sticky; bottom: 1rem; gap: 0.5rem; align-items: center; margin-top: auto !important; padding: 0.55rem; border: 1px solid #e3e4e7; border-radius: 9px; background: #fff; box-shadow: 0 5px 18px #59616d0a; z-index: 3; }.assistant-composer input { min-width: 0; flex: 1; padding: 0.5rem 0.6rem; border: 0; background: transparent; color: #34363b; font-size: 0.8rem; }.assistant-composer button { display: grid; width: 2rem; height: 2rem; place-items: center; padding: 0; border-radius: 6px; color: #fff; background: #8b5cf6; }.assistant-composer button:hover { background: #7650dc; }.assistant-composer button:disabled { cursor: wait; opacity: 0.6; }
 .settings-section { margin-top: 1.25rem; padding: 1.1rem; border: 1px solid #e3e4e7; border-radius: 9px; background: #fff; box-shadow: 0 5px 18px #59616d0a; }.settings-section-heading h3 { margin: 0; color: #313238; font-size: 0.88rem; }.settings-section-heading p { margin: 0.3rem 0 1rem; color: #92959c; font-size: 0.74rem; }.settings-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }.settings-form label { color: #666a73; font-size: 0.72rem; }.settings-form input, .settings-form select, .settings-form textarea { width: 100%; border: 1px solid #e0e2e5; border-radius: 6px; background: #fff; color: #45474e; font-size: 0.78rem; }.settings-form textarea { min-height: 6rem; resize: vertical; line-height: 1.5; }.assistant-prompt-field { grid-column: 1 / -1; }.settings-form input[readonly] { color: #92959c; background: #fafafa; }.settings-form button { width: fit-content; padding: 0.55rem 0.8rem; border-radius: 6px; color: #fff; background: #8b5cf6; font-size: 0.72rem; font-weight: 650; }.settings-form button:hover { background: #7650dc; }.settings-form button:disabled { cursor: wait; opacity: 0.7; }.settings-error, .settings-notice { grid-column: 1 / -1; margin: 0; font-size: 0.72rem; }.settings-error { color: #b64b42; }.settings-notice { color: #31776b; }.platform-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid #ececef; border-radius: 7px; }.platform-settings > div { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.65rem 0.75rem; border-bottom: 1px solid #ececef; color: #777b83; font-size: 0.72rem; }.platform-settings > div:nth-last-child(-n + 2) { border-bottom: 0; }.platform-settings > div:nth-child(odd) { border-right: 1px solid #ececef; }.platform-settings span { color: #92959c; }.platform-settings strong { color: #45474e; font-weight: 650; text-align: right; }.user-management { overflow: hidden; border: 1px solid #ececef; border-radius: 7px; }.managed-user { display: grid; grid-template-columns: minmax(0, 1fr) 7rem 5.5rem; gap: 0.65rem; align-items: center; padding: 0.7rem 0.75rem; border-bottom: 1px solid #ececef; }.managed-user:last-child { border-bottom: 0; }.managed-user strong, .managed-user small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.managed-user strong { color: #45474e; font-size: 0.78rem; }.managed-user small { margin-top: 0.16rem; color: #92959c; font-size: 0.67rem; }.managed-user select { padding: 0.45rem 0.5rem; border: 1px solid #e1e2e5; border-radius: 6px; color: #666a73; background: #fff; font-size: 0.72rem; }.managed-user button { padding: 0.45rem 0.5rem; border-radius: 6px; color: #7650dc; background: #f2efff; font-size: 0.7rem; }.managed-user button:hover { background: #e9e2ff; }.managed-user button:disabled { cursor: wait; opacity: 0.7; }
 .journal-entry-row { display: grid; grid-template-columns: 1.8rem minmax(0, 1fr) auto; gap: 0.65rem; align-items: center; width: 100%; padding: 0.85rem 0.9rem; border: 1px solid #e5e6e8; border-bottom: 0; color: #45474e; background: #fff; text-align: left; }.journal-entry-row:first-of-type { border-radius: 9px 9px 0 0; }.journal-entry-row:last-of-type { border-bottom: 1px solid #e5e6e8; border-radius: 0 0 9px 9px; }.journal-entry-row:only-of-type { border-radius: 9px; }.journal-entry-row:hover { border-color: #ddd3ff; background: #faf9ff; }.journal-entry-row > svg { color: #8255ec; }.journal-entry-row strong, .journal-entry-row small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.journal-entry-row strong { font-size: 0.8rem; }.journal-entry-row small { margin-top: 0.2rem; color: #92959c; font-size: 0.7rem; }.journal-entry-row > svg:last-child { color: #b3b5bb; }
 .journal-entry-list { margin-top: 1rem; }
@@ -2951,6 +2993,8 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 :root[data-theme='dark'] .assistant-choice { background: #202329; border-color: #333740; color: #d5d8de; }
 :root[data-theme='dark'] .assistant-choice:hover:not(:disabled) { border-color: #a78bfa; background: #2b2540; color: #fff; }
 :root[data-theme='dark'] .assistant-choice.chosen { border-color: #a78bfa; background: #2b2540; color: #d6c9ff; }
+:root[data-theme='dark'] .assistant-choices-hint { color: #7d818a; }
+:root[data-theme='dark'] .assistant-starter svg { color: #a78bfa; }
 .assistant-message { width: fit-content; max-width: min(100%, 42rem); padding: 0; color: #4b4d54; background: transparent; font-size: 0.82rem; line-height: 1.6; }
 .assistant-message.user { justify-self: end; background: transparent; }
 .assistant-message-body { padding: 0.7rem 0.85rem; border-radius: 8px; background: #f6f6f7; }
