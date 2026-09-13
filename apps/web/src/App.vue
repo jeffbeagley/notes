@@ -2027,6 +2027,8 @@ function handleAssistantLinkClick(event: MouseEvent, message: AssistantMessage) 
 async function openHit(hit: SearchHit) {
   if (hit.type === 'note') {
     await openNote(hit.id);
+  } else if (hit.type === 'summary') {
+    if (hit.periodKey) await router.push({ name: 'summaryDetail', params: { periodKey: hit.periodKey } });
   } else if (hit.type === 'journal') {
     await openJournalEntry(hit.date);
   } else if (hit.type === 'task') {

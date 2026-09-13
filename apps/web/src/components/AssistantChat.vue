@@ -66,7 +66,7 @@
 <script setup lang="ts">
 import { ArrowUpRight, Check, CheckCircle2, Copy, Loader2, Pencil, RotateCcw, Send, Sparkles } from '@lucide/vue';
 
-export type AssistantSearchHit = { id: string; type: 'note' | 'journal' | 'task'; title: string; snippet: string; date: string };
+export type AssistantSearchHit = { id: string; type: 'note' | 'journal' | 'task' | 'summary'; title: string; snippet: string; date: string; periodKey?: string };
 export type AssistantToolCall = { name: string; args: Record<string, unknown>; status: 'running' | 'done'; summary?: string; ok?: boolean; source?: AssistantSearchHit };
 export type AssistantChoiceOption = { label: string; value: string; hint?: string };
 export type AssistantChoices = { question: string; options: AssistantChoiceOption[] };

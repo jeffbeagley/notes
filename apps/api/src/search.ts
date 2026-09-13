@@ -430,6 +430,8 @@ export function registerSearchRoutes(app: FastifyInstance, prisma: PrismaClient)
       prisma.note.findMany({
         where: {
           userId: user.id,
+          // daily_briefing notes have no standalone detail route, so they can't be opened from a hit.
+          type: { in: ['note', 'summary'] },
           OR: [
             ...terms.flatMap((term) => [{ title: { contains: term, mode: 'insensitive' as const } }, { bodyMarkdown: { contains: term, mode: 'insensitive' as const } }]),
           ],
@@ -463,10 +465,11 @@ export function registerSearchRoutes(app: FastifyInstance, prisma: PrismaClient)
     const hits = [
       ...matchingNotes.map((n) => ({
         id: n.id,
-        type: 'note' as const,
+        type: (n.type === 'summary' ? 'summary' : 'note') as 'note' | 'summary',
         title: n.title,
         snippet: getSnippet(n.bodyMarkdown, queryStr),
         date: n.updatedAt.toISOString().split('T')[0],
+        ...(n.type === 'summary' ? { periodKey: n.periodKey ?? undefined } : {}),
       })),
       ...matchingJournals.map((j) => ({
         id: j.id,
