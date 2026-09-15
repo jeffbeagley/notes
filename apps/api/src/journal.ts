@@ -24,9 +24,8 @@ export function localDate(timezone: string) {
   return `${value('year')}-${value('month')}-${value('day')}`;
 }
 
-export function journalBody(date: string, timezone: string) {
-  const heading = new Intl.DateTimeFormat('en-US', { timeZone: timezone, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(`${date}T12:00:00Z`));
-  return `# ${heading}\n\n## Carry forward\n\n- \n\n## Today's focus\n\n- \n\n## Notes\n\n\n## Tasks\n\n- [ ] \n\n## Wins / notes to future me\n\n`;
+export function journalBody(_date: string, _timezone: string) {
+  return `## Carry forward\n\n- \n\n## Today's focus\n\n- \n\n## Notes\n\n\n## Tasks\n\n- [ ] \n\n## Wins / notes to future me\n\n`;
 }
 
 function markdownTasks(bodyMarkdown: string) {
