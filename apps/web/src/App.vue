@@ -2833,7 +2833,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .search-replace-panel button:hover { color: #7650dc; border-color: #c9baf8; background: #faf9ff; }
 .tiptap-editor { min-height: 32rem; padding: 0; border: 0; border-radius: 0 0 8px 8px; background: #fff; box-shadow: none; margin: 0; }
 .editor > .upload-control { display: none; }
-.tiptap-editor .prose-editor { box-sizing: border-box; width: 100%; min-height: 32rem; margin: 0; padding: 3rem clamp(1rem, 5vw, 4rem) clamp(2rem, 5vw, 4rem); color: #404249; font-size: 0.95rem; line-height: 1.75; }
+.tiptap-editor .prose-editor { box-sizing: border-box; width: 100%; min-height: 32rem; margin: 0; padding: 1rem; color: #404249; font-size: 0.95rem; line-height: 1.75; }
 .tiptap-editor .prose-editor pre { overflow-x: auto; margin: 1.25rem 0; padding: 1rem 1.15rem; border: 1px solid #343b4a; border-radius: 7px; background: #20242d; box-shadow: 0 3px 9px #1c1d211f; color: #d9e1ee; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.82rem; line-height: 1.65; }
 .tiptap-editor .prose-editor pre code { display: block; padding: 0; border: 0; border-radius: 0; color: inherit; background: transparent; font: inherit; }
 .tiptap-editor .prose-editor .hljs-keyword, .tiptap-editor .prose-editor .hljs-selector-tag, .tiptap-editor .prose-editor .hljs-literal { color: #d4a8ff; }.tiptap-editor .prose-editor .hljs-string, .tiptap-editor .prose-editor .hljs-attr { color: #a8d89d; }.tiptap-editor .prose-editor .hljs-number, .tiptap-editor .prose-editor .hljs-built_in { color: #f0c674; }.tiptap-editor .prose-editor .hljs-title, .tiptap-editor .prose-editor .hljs-function { color: #7fcbff; }.tiptap-editor .prose-editor .hljs-comment { color: #87909f; font-style: italic; }
