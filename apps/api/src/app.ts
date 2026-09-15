@@ -175,7 +175,7 @@ export async function createApp(prisma = new PrismaClient()) {
   app.get('/api/v1/settings/user', async (request, reply) => {
     const user = await currentUser(request, prisma);
     if (!user) return reply.code(401).send({ error: 'authentication required' });
-    return { settings: { username: user.username, displayName: user.displayName, email: user.email, role: user.role, timezone: user.timezone, assistantPrompt: user.assistantPrompt, briefingPrompt: user.briefingPrompt } };
+    return { settings: { username: user.username, displayName: user.displayName, email: user.email, role: user.role, timezone: user.timezone, assistantPrompt: user.assistantPrompt, briefingPrompt: user.briefingPrompt, journalTemplate: user.journalTemplate, journalTemplateVersion: user.journalTemplateVersion } };
   });
 
   app.patch<{ Body: { timezone?: string; email?: string | null; displayName?: string | null; assistantPrompt?: string | null; briefingPrompt?: string | null } }>('/api/v1/settings/user', async (request, reply) => {
@@ -199,7 +199,39 @@ export async function createApp(prisma = new PrismaClient()) {
     const existing = email ? await prisma.user.findUnique({ where: { email } }) : null;
     if (existing && existing.id !== user.id) return reply.code(409).send({ error: 'email is already in use' });
     const updated = await prisma.user.update({ where: { id: user.id }, data: { timezone, email, displayName, assistantPrompt, briefingPrompt } });
-    return { settings: { username: updated.username, displayName: updated.displayName, email: updated.email, role: updated.role, timezone: updated.timezone, assistantPrompt: updated.assistantPrompt, briefingPrompt: updated.briefingPrompt } };
+    return { settings: { username: updated.username, displayName: updated.displayName, email: updated.email, role: updated.role, timezone: updated.timezone, assistantPrompt: updated.assistantPrompt, briefingPrompt: updated.briefingPrompt, journalTemplate: updated.journalTemplate, journalTemplateVersion: updated.journalTemplateVersion } };
+  });
+
+  app.patch<{ Body: { journalTemplate?: string | null } }>('/api/v1/settings/journal-template', async (request, reply) => {
+    const user = await currentUser(request, prisma);
+    if (!user) return reply.code(401).send({ error: 'authentication required' });
+    const journalTemplate = request.body.journalTemplate?.trim() || null;
+    if (journalTemplate && journalTemplate.length > 8000) return reply.code(400).send({ error: 'journal template must be 8,000 characters or fewer' });
+    if (journalTemplate === user.journalTemplate) return { journalTemplate: user.journalTemplate, journalTemplateVersion: user.journalTemplateVersion };
+    const updated = await prisma.$transaction(async (tx) => {
+      const saved = await tx.user.update({ where: { id: user.id }, data: { journalTemplate, journalTemplateVersion: { increment: 1 } } });
+      await tx.documentVersion.create({ data: { userId: user.id, documentType: 'journal_template', documentId: user.id, versionN: saved.journalTemplateVersion, bodyMarkdown: journalTemplate ?? '', source: 'manual' } });
+      return saved;
+    });
+    return { journalTemplate: updated.journalTemplate, journalTemplateVersion: updated.journalTemplateVersion };
+  });
+
+  app.get('/api/v1/settings/journal-template/versions', async (request, reply) => {
+    const user = await currentUser(request, prisma);
+    if (!user) return reply.code(401).send({ error: 'authentication required' });
+    return { versions: await prisma.documentVersion.findMany({ where: { userId: user.id, documentType: 'journal_template', documentId: user.id }, select: { id: true, versionN: true, bodyMarkdown: true, source: true, createdAt: true }, orderBy: { createdAt: 'desc' }, take: 50 }) };
+  });
+
+  app.post<{ Params: { versionId: string } }>('/api/v1/settings/journal-template/versions/:versionId/restore', async (request, reply) => {
+    const user = await currentUser(request, prisma);
+    if (!user) return reply.code(401).send({ error: 'authentication required' });
+    const snapshot = await prisma.documentVersion.findFirst({ where: { id: request.params.versionId, userId: user.id, documentType: 'journal_template', documentId: user.id } });
+    if (!snapshot) return reply.code(404).send({ error: 'version not found' });
+    const restored = await prisma.$transaction(async (tx) => {
+      await tx.documentVersion.create({ data: { userId: user.id, documentType: 'journal_template', documentId: user.id, versionN: user.journalTemplateVersion + 1, bodyMarkdown: user.journalTemplate ?? '', source: 'restore' } });
+      return tx.user.update({ where: { id: user.id }, data: { journalTemplate: snapshot.bodyMarkdown || null, journalTemplateVersion: { increment: 1 } } });
+    });
+    return { journalTemplate: restored.journalTemplate, journalTemplateVersion: restored.journalTemplateVersion };
   });
 
   app.get('/api/v1/settings/platform', async (request, reply) => {

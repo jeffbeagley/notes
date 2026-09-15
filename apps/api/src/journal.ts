@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { currentUser } from './auth.js';
 import { jobQueue, processCarryForward } from './queue.js';
 import { replaceContextChunks } from './context.js';
+import { callLlm, llmRouteOptions } from './llm.js';
 
 type TaskBody = { title?: string; notes?: string; status?: TaskStatus; dueDate?: string | null; sourceType?: TaskSourceType; sourceId?: string | null; sortOrder?: number };
 type JournalBody = { bodyMarkdown?: string; baseVersion?: number; source?: 'autosave' | 'manual' | 'restore' | 'rewrite_apply' };
@@ -23,9 +24,10 @@ export function localDate(timezone: string) {
   return `${value('year')}-${value('month')}-${value('day')}`;
 }
 
-export function journalBody(date: string, timezone: string) {
-  const heading = new Intl.DateTimeFormat('en-US', { timeZone: timezone, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(`${date}T12:00:00Z`));
-  return `# ${heading}\n\n## Carry forward\n\n- \n\n## Today's focus\n\n- \n\n## Notes\n\n\n## Tasks\n\n- [ ] \n\n## Wins / notes to future me\n\n`;
+const defaultJournalTemplate = `## Carry forward\n\n- \n\n## Today's focus\n\n- \n\n## Notes\n\n\n## Tasks\n\n- [ ] \n\n## Wins / notes to future me\n\n`;
+
+export function journalBody(customTemplate?: string | null) {
+  return customTemplate?.trim() ? customTemplate : defaultJournalTemplate;
 }
 
 function markdownTasks(bodyMarkdown: string) {
@@ -67,6 +69,27 @@ export function registerJournalRoutes(app: FastifyInstance, prisma: PrismaClient
     return { journal };
   });
 
+  app.post<{ Params: { date: string }; Body: { selectedText?: string; instruction?: string } }>('/api/v1/journals/:date/suggest-selection-rewrite', llmRouteOptions, async (request, reply) => {
+    const user = await requireUser(request, reply, prisma);
+    if (!user) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(request.params.date)) return reply.code(400).send({ error: 'date must use YYYY-MM-DD' });
+    const journal = await prisma.journal.findUnique({ where: { userId_journalDate: { userId: user.id, journalDate: new Date(`${request.params.date}T00:00:00Z`) } } });
+    if (!journal) return reply.code(404).send({ error: 'journal not found' });
+    const selectedText = request.body.selectedText?.trim();
+    if (!selectedText) return reply.code(400).send({ error: 'select text to rewrite' });
+    const instruction = request.body.instruction?.trim() || 'Improve clarity and concision.';
+    try {
+      const suggestion = await callLlm(prisma, [
+        { role: 'system', content: 'You are a precise writing editor. Rewrite only the selected text according to the instruction. Preserve its meaning and Markdown formatting. Return only the replacement text.' },
+        { role: 'user', content: `Instruction: ${instruction}\n\nSelected text:\n${selectedText}` },
+      ]);
+      return { suggestion };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'LLM error';
+      return reply.code(503).send({ error: message });
+    }
+  });
+
   app.post<{ Body: CreateJournalBody }>('/api/v1/journals', async (request, reply) => {
     const user = await requireUser(request, reply, prisma);
     if (!user) return;
@@ -75,7 +98,7 @@ export function registerJournalRoutes(app: FastifyInstance, prisma: PrismaClient
     const journalDate = new Date(`${date}T00:00:00Z`);
     const journal = await prisma.journal.upsert({
       where: { userId_journalDate: { userId: user.id, journalDate } },
-      create: { userId: user.id, journalDate, bodyMarkdown: request.body.bodyMarkdown ?? journalBody(date, user.timezone) },
+      create: { userId: user.id, journalDate, bodyMarkdown: request.body.bodyMarkdown ?? journalBody(user.journalTemplate) },
       update: { bodyMarkdown: request.body.bodyMarkdown ?? undefined },
     });
     return reply.code(201).send({ journal });
@@ -118,7 +141,7 @@ export function registerJournalRoutes(app: FastifyInstance, prisma: PrismaClient
     }
 
     const journal = await prisma.journal.create({
-      data: { userId: user.id, journalDate: new Date(`${date}T00:00:00Z`), bodyMarkdown: journalBody(date, user.timezone) },
+      data: { userId: user.id, journalDate: new Date(`${date}T00:00:00Z`), bodyMarkdown: journalBody(user.journalTemplate) },
     });
 
     jobQueue.add('carry_forward', { journalId: journal.id, userId: user.id }).catch(() => {
@@ -134,7 +157,7 @@ export function registerJournalRoutes(app: FastifyInstance, prisma: PrismaClient
     const date = localDate(user.timezone);
     const journal = await prisma.journal.upsert({
       where: { userId_journalDate: { userId: user.id, journalDate: new Date(`${date}T00:00:00Z`) } },
-      create: { userId: user.id, journalDate: new Date(`${date}T00:00:00Z`), bodyMarkdown: journalBody(date, user.timezone) },
+      create: { userId: user.id, journalDate: new Date(`${date}T00:00:00Z`), bodyMarkdown: journalBody(user.journalTemplate) },
       update: {},
     });
     if (request.body.baseVersion !== undefined && request.body.baseVersion !== journal.version) {

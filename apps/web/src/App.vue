@@ -93,7 +93,6 @@
         <div class="home-content">
           <div class="welcome-block"><p class="eyebrow">Personal knowledge workspace</p><h2>Good {{ greeting }}, {{ user.displayName || user.username }}.</h2><p>Find a thought, continue a note, or ask your workspace a question.</p></div>
           <div class="dashboard-grid">
-            <section class="dashboard-section briefing-section"><div class="section-heading"><h3>Daily briefing</h3><button @click="openBriefing">Open briefing <ArrowUpRight :size="13" :stroke-width="1.8" /></button></div><div v-if="briefing" class="briefing-preview"><div class="briefing-preview-heading"><span class="today-mark"><Sparkles :size="15" :stroke-width="1.8" /></span><strong>{{ briefing.title || 'Today\'s briefing' }}</strong></div><div class="briefing-preview-body" v-html="markdown.render(briefing.bodyMarkdown.slice(0, 280) + (briefing.bodyMarkdown.length > 280 ? '...' : ''))" /></div><div v-else class="briefing-preview briefing-empty"><Sparkles :size="16" :stroke-width="1.8" /><p>No briefing has been generated for today.</p><button @click="generateBriefing">Generate briefing</button></div></section>
             <section class="dashboard-section recent-section"><div class="section-heading"><h3>Recent notes</h3><button @click="createNote(null)">New note <Plus :size="13" :stroke-width="1.8" /></button></div><div v-if="notes.length" class="recent-list"><button v-for="note in notes.slice(0, 4)" :key="note.id" class="recent-item" @click="openNote(note.id)"><span class="recent-icon"><FileText :size="15" :stroke-width="1.8" /></span><span><strong>{{ note.title || 'Untitled note' }}</strong><small>Updated {{ new Date(note.updatedAt).toLocaleDateString() }}</small></span><ArrowUpRight class="item-arrow" :size="15" :stroke-width="1.8" /></button></div><div v-else class="empty-dashboard">Your notes will appear here.</div></section>
             <section class="dashboard-section today-section"><div class="section-heading"><h3>Today</h3><button @click="openJournal">Open journal <ArrowUpRight :size="13" :stroke-width="1.8" /></button></div><div class="today-card"><span class="today-mark"><BookOpen :size="15" :stroke-width="1.8" /></span><div><strong>Daily journal</strong><p>Capture what is on your mind today.</p></div></div><div class="today-card task-summary" @click="openTasks('today')"><span class="today-mark"><CheckSquare :size="15" :stroke-width="1.8" /></span><div><strong>Tasks for today</strong><p>Keep the important work moving.</p></div></div></section>
           </div>
@@ -285,12 +284,12 @@
         </div>
       </article>
       <article v-if="activeNote" class="editor" :class="{ 'editor-dark': editorDark }">
-        <header><input v-model="activeNote.title" aria-label="Note title" @input="queueSave" /><span class="save-status">{{ saveStatus }}</span><button class="quiet" title="Open note assistant" @click="noteAssistantOpen = true"><MessageSquare :size="15" :stroke-width="1.8" />Assistant</button><button class="quiet" title="Save version" @click="saveNow('manual')">Save version</button><button class="quiet" title="Version history" @click="toggleVersions">History</button><button class="quiet" title="Archive note" @click="archiveNote">Archive</button><button class="quiet delete-note" title="Delete note" @click="deleteConfirmOpen = true"><Trash2 :size="15" /></button></header>
+        <header><input v-model="activeNote.title" aria-label="Note title" @input="queueSave" /><span class="save-status">{{ saveStatus }}</span><button class="quiet" title="Open note assistant" @click="noteAssistantOpen = true"><MessageSquare :size="15" :stroke-width="1.8" />Assistant</button><button class="quiet" title="Save version" @click="saveNow('manual')">Save version</button><button class="quiet" title="Version history" @click="toggleVersions">History</button><button class="quiet" title="Export to PDF" :disabled="exportingPdf" @click="requestExportPdf('note')">{{ exportingPdf ? 'Exporting...' : 'Export PDF' }}</button><button class="quiet" title="Archive note" @click="archiveNote">Archive</button><button class="quiet delete-note" title="Delete note" @click="deleteConfirmOpen = true"><Trash2 :size="15" /></button></header>
         <section class="note-organization" aria-label="Note organization">
           <label>Notebook <select v-model="activeNote.notebookId" aria-label="Note notebook" @change="saveNoteOrganization"><option :value="null">Unfiled</option><optgroup v-for="place in places" :key="place.id" :label="place.name"><option v-for="notebook in notebooksByPlace.get(place.id) ?? []" :key="notebook.id" :value="notebook.id">{{ notebook.name }}</option></optgroup></select></label>
-          <label>Tags <span class="tag-input"><input v-model="noteTagsInput" aria-label="Note tags" placeholder="project, meeting" @change="saveNoteOrganization" /><button type="button" title="Suggest and manage tags with AI" @click="openTagModal"><Sparkles :size="15" /></button></span></label>
+          <label>Tags <span class="tag-pills"><span v-if="!noteTagsList.length" class="tag-pill-empty">No tags</span><span v-for="tag in noteTagsList" :key="tag" class="tag-pill">{{ tag }}<button type="button" class="tag-pill-remove" :aria-label="`Remove tag ${tag}`" @click="removeNoteTag(tag)"><X :size="11" /></button></span><button type="button" class="tag-pill-add" title="Manage tags" @click="openTagModal"><Plus :size="14" /></button></span></label>
         </section>
-        <label class="upload-control" for="note-image-upload"><ImagePlus :size="14" :stroke-width="1.8" />Add image</label><input id="note-image-upload" class="image-upload-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" @change="uploadImage" /><RichTextToolbar :editor="editor" :is-dark="editorDark" :search-open="searchReplaceOpen" @upload="uploadImage" @insert-code="openCodeInsertModal('note')" @rewrite-selection="openSelectionRewriteModal" @toggle-search="searchReplaceOpen = !searchReplaceOpen" @toggle-theme="editorDark = !editorDark" />
+        <label class="upload-control" for="note-image-upload"><ImagePlus :size="14" :stroke-width="1.8" />Add image</label><input id="note-image-upload" class="image-upload-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" @change="uploadImage" /><RichTextToolbar :editor="editor" :is-dark="editorDark" :search-open="searchReplaceOpen" @upload="uploadImage" @insert-code="openCodeInsertModal('note')" @rewrite-selection="openSelectionRewriteModal('note')" @toggle-search="searchReplaceOpen = !searchReplaceOpen" @toggle-theme="editorDark = !editorDark" />
         <nav class="editor-toolbar" aria-label="Editor controls"><button title="Undo" @click="editor?.chain().focus().undo().run()"><Undo2 :size="16" /></button><button title="Redo" @click="editor?.chain().focus().redo().run()"><Redo2 :size="16" /></button><span class="toolbar-divider" /><button title="Heading" @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()"><Heading2 :size="16" /></button><button title="Bullet list" @click="editor?.chain().focus().toggleBulletList().run()"><List :size="16" /></button><button title="Task list" @click="editor?.chain().focus().toggleTaskList().run()"><ListChecks :size="16" /></button><button title="Blockquote" @click="editor?.chain().focus().toggleBlockquote().run()"><Quote :size="16" /></button><button title="Code block" @click="editor?.chain().focus().toggleCodeBlock().run()"><Code2 :size="16" /></button><span class="toolbar-divider" /><button title="Bold" @click="editor?.chain().focus().toggleBold().run()"><Bold :size="16" /></button><button title="Italic" @click="editor?.chain().focus().toggleItalic().run()"><Italic :size="16" /></button><button title="Strikethrough" @click="editor?.chain().focus().toggleStrike().run()"><Strikethrough :size="16" /></button><button title="Underline" @click="editor?.chain().focus().toggleUnderline().run()"><UnderlineIcon :size="16" /></button><button title="Highlight" @click="editor?.chain().focus().toggleHighlight().run()"><Highlighter :size="16" /></button><button title="Inline code" @click="editor?.chain().focus().toggleCode().run()"><Code2 :size="16" /></button><button title="Link" @click="applyNoteLink"><Link2 :size="16" /></button><button title="Superscript" @click="editor?.chain().focus().toggleSuperscript().run()"><SuperscriptIcon :size="16" /></button><button title="Subscript" @click="editor?.chain().focus().toggleSubscript().run()"><SubscriptIcon :size="16" /></button><span class="toolbar-divider" /><button title="Align left" @click="editor?.chain().focus().setTextAlign('left').run()"><AlignLeft :size="16" /></button><button title="Align center" @click="editor?.chain().focus().setTextAlign('center').run()"><AlignCenter :size="16" /></button><button title="Align right" @click="editor?.chain().focus().setTextAlign('right').run()"><AlignRight :size="16" /></button><button title="Align justify" @click="editor?.chain().focus().setTextAlign('justify').run()"><AlignJustify :size="16" /></button><span class="toolbar-divider" /><button title="Add image" @click="openImagePicker"><ImagePlus :size="16" /><span class="toolbar-add-label">Add</span></button><span class="toolbar-spacer" /><button title="Search and replace" @click="searchReplaceOpen = !searchReplaceOpen"><Replace :size="16" /></button><button :title="editorDark ? 'Switch to light mode' : 'Switch to dark mode'" @click="editorDark = !editorDark"> <Sun v-if="editorDark" :size="16" /><Moon v-else :size="16" /></button></nav>
         <div v-if="searchReplaceOpen" class="search-replace-panel"><input v-model="findText" placeholder="Find" aria-label="Find text" /><input v-model="replaceText" placeholder="Replace" aria-label="Replace text" /><button @click="replaceNext">Replace next</button><button @click="replaceAll">Replace all</button></div>
         <EditorContent v-if="editor" :editor="editor" class="tiptap-editor" @mousedown="focusEditorAtPointer" />
@@ -313,7 +312,7 @@
           <button class="quiet" title="Older entry" :disabled="!canGoOlderJournal" @click="goToAdjacentJournal('older')"><ChevronLeft :size="15" :stroke-width="1.8" /></button>
           <strong>{{ isHistoricalJournal ? formatJournalDate(journal.journalDate) : 'Today' }}</strong>
           <button class="quiet" title="Newer entry" :disabled="!canGoNewerJournal" @click="goToAdjacentJournal('newer')"><ChevronRight :size="15" :stroke-width="1.8" /></button>
-          <span class="save-status">{{ journalSaveStatus }}</span><button class="quiet" title="Open journal assistant" @click="journalAssistantOpen = true"><MessageSquare :size="15" :stroke-width="1.8" />Assistant</button><button class="quiet" title="Save journal version" @click="saveJournal('manual')">Save version</button><button v-if="!isHistoricalJournal" class="quiet" title="Journal version history" @click="toggleVersions">History</button></header>
+          <span class="save-status">{{ journalSaveStatus }}</span><button class="quiet" title="Open journal assistant" @click="journalAssistantOpen = true"><MessageSquare :size="15" :stroke-width="1.8" />Assistant</button><button class="quiet" title="Save journal version" @click="saveJournal('manual')">Save version</button><button v-if="!isHistoricalJournal" class="quiet" title="Journal version history" @click="toggleVersions">History</button><button class="quiet" title="Export to PDF" :disabled="exportingPdf" @click="requestExportPdf('journal')">{{ exportingPdf ? 'Exporting...' : 'Export PDF' }}</button></header>
         <button v-if="journal.suggestedCarryForward?.suggestions?.length" class="carry-forward-toggle" :aria-expanded="carryForwardOpen" @click="carryForwardOpen = !carryForwardOpen"><List :size="15" :stroke-width="1.8" />Suggested items <span>{{ journal.suggestedCarryForward.suggestions.length }}</span></button>
         <section v-if="journal.suggestedCarryForward?.suggestions?.length" class="carry-forward-panel" :class="{ 'carry-forward-expanded': carryForwardOpen }">
           <h3>Suggested carry-forward items</h3>
@@ -323,7 +322,7 @@
             <button class="quiet" @click="dismissCarryForward(s)">Dismiss</button>
           </div>
         </section>
-        <RichTextToolbar :editor="journalEditor" :is-dark="editorDark" :search-open="searchReplaceOpen" @upload="uploadImage" @insert-code="openCodeInsertModal('journal')" @toggle-search="searchReplaceOpen = !searchReplaceOpen" @toggle-theme="editorDark = !editorDark" />
+        <RichTextToolbar :editor="journalEditor" :is-dark="editorDark" :search-open="searchReplaceOpen" @upload="uploadImage" @insert-code="openCodeInsertModal('journal')" @rewrite-selection="openSelectionRewriteModal('journal')" @toggle-search="searchReplaceOpen = !searchReplaceOpen" @toggle-theme="editorDark = !editorDark" />
         <nav class="editor-toolbar" aria-label="Journal editor controls"><button title="Undo" @click="journalEditor?.chain().focus().undo().run()"><Undo2 :size="16" /></button><button title="Redo" @click="journalEditor?.chain().focus().redo().run()"><Redo2 :size="16" /></button><span class="toolbar-divider" /><button title="Heading" @click="journalEditor?.chain().focus().toggleHeading({ level: 2 }).run()"><Heading2 :size="16" /></button><button title="Bullet list" @click="journalEditor?.chain().focus().toggleBulletList().run()"><List :size="16" /></button><button title="Task list" @click="journalEditor?.chain().focus().toggleTaskList().run()"><ListChecks :size="16" /></button><span class="toolbar-divider" /><button title="Bold" @click="journalEditor?.chain().focus().toggleBold().run()"><Bold :size="16" /></button><button title="Italic" @click="journalEditor?.chain().focus().toggleItalic().run()"><Italic :size="16" /></button><button title="Strikethrough" @click="journalEditor?.chain().focus().toggleStrike().run()"><Strikethrough :size="16" /></button><button title="Underline" @click="journalEditor?.chain().focus().toggleUnderline().run()"><UnderlineIcon :size="16" /></button><button title="Highlight" @click="journalEditor?.chain().focus().toggleHighlight().run()"><Highlighter :size="16" /></button><button title="Code block" @click="journalEditor?.chain().focus().toggleCodeBlock().run()"><Code2 :size="16" /></button><button title="Link" @click="applyJournalLink"><Link2 :size="16" /></button><button title="Superscript" @click="journalEditor?.chain().focus().toggleSuperscript().run()"><SuperscriptIcon :size="16" /></button><button title="Subscript" @click="journalEditor?.chain().focus().toggleSubscript().run()"><SubscriptIcon :size="16" /></button><span class="toolbar-divider" /><button title="Align left" @click="journalEditor?.chain().focus().setTextAlign('left').run()"><AlignLeft :size="16" /></button><button title="Align center" @click="journalEditor?.chain().focus().setTextAlign('center').run()"><AlignCenter :size="16" /></button><button title="Align right" @click="journalEditor?.chain().focus().setTextAlign('right').run()"><AlignRight :size="16" /></button><button title="Justify" @click="journalEditor?.chain().focus().setTextAlign('justify').run()"><AlignJustify :size="16" /></button></nav>
         <div v-if="searchReplaceOpen" class="search-replace-panel"><input v-model="findText" placeholder="Find" aria-label="Find text" /><input v-model="replaceText" placeholder="Replace" aria-label="Replace text" /><button @click="replaceNext">Replace next</button><button @click="replaceAll">Replace all</button></div>
         <EditorContent v-if="journalEditor" :editor="journalEditor" class="tiptap-editor" @mousedown="focusEditorAtPointer" />
@@ -337,6 +336,7 @@
           </aside>
         </div>
         <aside v-if="versionsOpen" class="versions"><header><h2>Version history</h2><button title="Close version history" @click="versionsOpen = false">Close</button></header><p v-if="!versions.length">No saved versions yet.</p><div v-for="item in versions" :key="item.id" class="version"><span>v{{ item.versionN }} · {{ item.source }} · {{ new Date(item.createdAt).toLocaleString() }}</span><button @click="restoreVersion(item.id)">Restore</button></div></aside>
+        <div v-if="selectionRewriteOpen" class="confirm-backdrop"><section class="confirm-dialog ai-dialog rewrite-dialog" role="dialog" aria-modal="true" aria-labelledby="rewrite-ai-title"><header><h2 id="rewrite-ai-title">Rewrite selection</h2><button class="quiet" @click="selectionRewriteOpen = false">Close</button></header><label>Style <select v-model="rewriteStyle" aria-label="Rewrite style"><option value="Improve clarity and concision.">Clear and concise</option><option value="Make the tone more professional while preserving meaning.">Professional</option><option value="Make the tone warmer and friendlier while preserving meaning.">Friendly</option><option value="Simplify the language while preserving meaning.">Simplify</option></select></label><label>Additional instruction <input v-model="rewriteInstruction" aria-label="Additional rewrite instruction" placeholder="Optional instruction" /></label><div class="rewrite-source"><strong>Selected text</strong><p>{{ selectionRewriteText }}</p></div><button :disabled="aiLoading === 'rewrite'" @click="requestSelectionRewrite">{{ aiLoading === 'rewrite' ? 'Generating...' : 'Generate rewrite' }}</button><p v-if="aiError" class="error">{{ aiError }}</p><div v-if="selectionRewriteSuggestion" class="rewrite-diff"><strong>Review changes</strong><del>{{ selectionRewriteText }}</del><ins>{{ selectionRewriteSuggestion }}</ins></div><div class="dialog-actions"><button class="quiet" @click="selectionRewriteOpen = false">Cancel</button><button :disabled="!selectionRewriteSuggestion" @click="applySelectionRewrite">Apply replacement</button></div></section></div>
       </article>
       <article v-else-if="view === 'journalArchive'" class="tasks journal-archive">
         <header><h2>Journal archive</h2><button class="quiet" @click="openJournal">Open today</button></header>
@@ -364,9 +364,9 @@
         </div>
       </article>
       <article v-else-if="view === 'briefing'" class="editor">
-        <header><strong>Daily Briefing</strong><button class="quiet" :disabled="generatingBriefing" @click="generateBriefing">{{ generatingBriefing ? 'Generating...' : 'Regenerate Briefing' }}</button></header>
+        <header><strong>Daily Briefing <span class="briefing-date">{{ briefingDate }}</span></strong><div class="briefing-actions"><button class="quiet" title="Export to PDF" :disabled="exportingPdf" @click="requestExportPdf('briefing')">{{ exportingPdf ? 'Exporting...' : 'Export PDF' }}</button><button class="quiet" :disabled="generatingBriefing" @click="generateBriefing">{{ generatingBriefing ? 'Generating...' : 'Regenerate Briefing' }}</button></div></header>
         <div v-if="briefing" class="briefing-content">
-          <div v-html="markdown.render(briefing.bodyMarkdown)" />
+          <div v-html="markdown.render(briefingBodyMarkdown)" />
         </div>
         <div v-else class="empty">
           <p>No briefing note for today yet.</p>
@@ -409,13 +409,29 @@
       </article>
       <article v-else-if="view === 'settings'" class="tasks settings-view">
         <header><h2>Settings</h2></header>
-        <section class="settings-section"><div class="settings-section-heading"><h3>User settings</h3><p>Preferences for your account and daily journal.</p></div><form class="settings-form" @submit.prevent="saveUserSettings"><label>Username <input :value="userSettings.username" readonly /></label><label>Display name <input v-model="userSettings.displayName" aria-label="Display name" placeholder="How your name appears" maxlength="80" /></label><label>Account role <input :value="userSettings.role" readonly /></label><label>Email <input v-model="userSettings.email" type="email" aria-label="Email" placeholder="you@example.com" /></label><label>Timezone <input v-model="userSettings.timezone" aria-label="Timezone" placeholder="America/Chicago" required /></label><label class="assistant-prompt-field">Assistant instructions <textarea v-model="userSettings.assistantPrompt" aria-label="Assistant instructions" maxlength="4000" /></label><label class="assistant-prompt-field">Daily briefing instructions <textarea v-model="userSettings.briefingPrompt" aria-label="Daily briefing instructions" maxlength="4000" /></label><p v-if="settingsError" class="settings-error">{{ settingsError }}</p><p v-if="settingsNotice" class="settings-notice" role="status">{{ settingsNotice }}</p><button :disabled="savingSettings">{{ savingSettings ? 'Saving...' : 'Save settings' }}</button></form></section>
-        <section class="settings-section"><div class="settings-section-heading"><h3>Change password</h3><p>Use at least twelve characters and keep this password private.</p></div><form class="settings-form password-settings-form" @submit.prevent="changePassword"><label>Current password <input v-model="passwordChange.currentPassword" type="password" aria-label="Current password" autocomplete="current-password" required /></label><label>New password <input v-model="passwordChange.newPassword" type="password" aria-label="New password" autocomplete="new-password" minlength="12" required /></label><label>Confirm new password <input v-model="passwordChange.confirmPassword" type="password" aria-label="Confirm new password" autocomplete="new-password" minlength="12" required /></label><p v-if="passwordChangeError" class="settings-error">{{ passwordChangeError }}</p><p v-if="passwordChangeNotice" class="settings-notice" role="status">{{ passwordChangeNotice }}</p><button :disabled="changingPassword">{{ changingPassword ? 'Updating...' : 'Update password' }}</button></form></section>
-        <section v-if="user?.role === 'admin'" class="settings-section"><div class="settings-section-heading"><h3>Platform settings</h3><p>Managed by deployment configuration and shown without secrets.</p></div><div v-if="platformSettings" class="platform-settings"><div><span>Runtime</span><strong>{{ platformSettings.runtime }}</strong></div><div><span>Password sign-in</span><strong>{{ platformSettings.authentication.passwordEnabled ? 'Enabled' : 'Disabled' }}</strong></div><div><span>Single sign-on</span><strong>{{ platformSettings.authentication.oidcConfigured ? 'Configured' : 'Not configured' }}</strong></div><div><span>Session signing</span><strong>{{ platformSettings.authentication.sessionSecretConfigured ? 'Configured' : 'Development default' }}</strong></div><div><span>AI search</span><strong>{{ platformSettings.integrations.aiEnabled ? 'Enabled' : 'Disabled' }}</strong></div><div><span>AI credential</span><strong>{{ platformSettings.integrations.aiCredentialConfigured ? 'Configured' : 'Not configured' }}</strong></div><div><span>Queue service</span><strong>{{ platformSettings.integrations.queueConfigured ? 'Configured' : 'Not configured' }}</strong></div><div><span>Media storage</span><strong>{{ platformSettings.storage.mediaStorageConfigured ? 'Configured' : 'Not configured' }}</strong></div></div></section>
-        <section v-if="user?.role === 'admin'" class="settings-section"><div class="settings-section-heading"><h3>Create local user</h3><p>Create a password-based account. Adding an email allows verified SSO to link to this account.</p></div><form class="settings-form" @submit.prevent="createLocalUser"><label>Username <input v-model="newLocalUser.username" aria-label="New username" autocomplete="off" required /></label><label>Email <input v-model="newLocalUser.email" type="email" aria-label="New user email" placeholder="user@example.com" /></label><label>Password <input v-model="newLocalUser.password" type="password" aria-label="New user password" autocomplete="new-password" minlength="12" required /></label><label>Role <select v-model="newLocalUser.role" aria-label="New user role"><option value="user">User</option><option value="admin">Admin</option></select></label><p v-if="userManagementError" class="settings-error">{{ userManagementError }}</p><button :disabled="creatingUser">{{ creatingUser ? 'Creating...' : 'Create user' }}</button></form></section>
-        <section v-if="user?.role === 'admin'" class="settings-section"><div class="settings-section-heading"><h3>Users</h3><p>Manage account roles. Changes take effect on the user’s next request.</p></div><p v-if="userManagementError" class="settings-error">{{ userManagementError }}</p><div class="user-management"><div v-for="managedUser in managedUsers" :key="managedUser.id" class="managed-user"><span><strong>{{ managedUser.username }}</strong><small>{{ managedUser.email || 'No email address' }} · {{ managedUser.timezone }}</small></span><select v-model="managedUser.role" :aria-label="`${managedUser.username} role`"><option value="user">User</option><option value="admin">Admin</option></select><button :disabled="managingUserId === managedUser.id" @click="saveUserRole(managedUser)">{{ managingUserId === managedUser.id ? 'Saving...' : 'Save role' }}</button></div></div></section>
+        <div class="settings-layout">
+          <nav class="settings-nav" aria-label="Settings sections">
+            <button type="button" :class="{ active: settingsTab === 'account' }" @click="settingsTab = 'account'">Account</button>
+            <button type="button" :class="{ active: settingsTab === 'ai' }" @click="settingsTab = 'ai'">AI</button>
+            <button type="button" :class="{ active: settingsTab === 'journal' }" @click="settingsTab = 'journal'">Journal</button>
+            <button type="button" :class="{ active: settingsTab === 'security' }" @click="settingsTab = 'security'">Security</button>
+            <button v-if="user?.role === 'admin'" type="button" :class="{ active: settingsTab === 'admin' }" @click="settingsTab = 'admin'">Admin</button>
+          </nav>
+          <div class="settings-panels">
+            <section v-if="settingsTab === 'account'" class="settings-section"><div class="settings-section-heading"><h3>Account</h3><p>Preferences for your account and profile.</p></div><form class="settings-form" @submit.prevent="saveUserSettings"><label>Username <input :value="userSettings.username" readonly /></label><label>Display name <input v-model="userSettings.displayName" aria-label="Display name" placeholder="How your name appears" maxlength="80" /></label><label>Account role <input :value="userSettings.role" readonly /></label><label>Email <input v-model="userSettings.email" type="email" aria-label="Email" placeholder="you@example.com" /></label><label>Timezone <input v-model="userSettings.timezone" aria-label="Timezone" placeholder="America/Chicago" required /></label><p v-if="settingsError" class="settings-error">{{ settingsError }}</p><p v-if="settingsNotice" class="settings-notice" role="status">{{ settingsNotice }}</p><button :disabled="savingSettings">{{ savingSettings ? 'Saving...' : 'Save settings' }}</button></form></section>
+            <section v-if="settingsTab === 'ai'" class="settings-section"><div class="settings-section-heading"><h3>AI</h3><p>Instructions used by the assistant and daily briefing.</p></div><form class="settings-form" @submit.prevent="saveUserSettings"><label class="assistant-prompt-field">Assistant instructions <textarea v-model="userSettings.assistantPrompt" aria-label="Assistant instructions" maxlength="4000" /></label><label class="assistant-prompt-field">Daily briefing instructions <textarea v-model="userSettings.briefingPrompt" aria-label="Daily briefing instructions" maxlength="4000" /></label><p v-if="settingsError" class="settings-error">{{ settingsError }}</p><p v-if="settingsNotice" class="settings-notice" role="status">{{ settingsNotice }}</p><button :disabled="savingSettings">{{ savingSettings ? 'Saving...' : 'Save settings' }}</button></form></section>
+            <section v-if="settingsTab === 'journal'" class="settings-section"><div class="settings-section-heading"><h3>Journal template</h3><p>Customize the starting content for new journal entries. This only applies to entries created from now on; existing entries are not changed.</p></div><form class="settings-form journal-template-form" @submit.prevent="saveJournalTemplate"><label class="assistant-prompt-field">Template <textarea v-model="journalTemplateDraft" aria-label="Journal template" :placeholder="defaultJournalTemplate" maxlength="8000" rows="14" /></label><p v-if="journalTemplateError" class="settings-error">{{ journalTemplateError }}</p><p v-if="journalTemplateNotice" class="settings-notice" role="status">{{ journalTemplateNotice }}</p><div class="dialog-actions"><button type="button" class="quiet" @click="resetJournalTemplate">Reset to default</button><button type="button" class="quiet" @click="toggleJournalTemplateVersions">{{ journalTemplateVersionsOpen ? 'Hide history' : 'History' }}</button><button :disabled="savingJournalTemplate">{{ savingJournalTemplate ? 'Saving...' : 'Save template' }}</button></div></form><aside v-if="journalTemplateVersionsOpen" class="versions inline-versions"><header><h2>Template history</h2><button title="Close template history" @click="journalTemplateVersionsOpen = false">Close</button></header><p v-if="!journalTemplateVersions.length">No saved versions yet.</p><div v-for="item in journalTemplateVersions" :key="item.id" class="version"><span>v{{ item.versionN }} · {{ item.source }} · {{ new Date(item.createdAt).toLocaleString() }}</span><button @click="restoreJournalTemplateVersion(item.id)">Restore</button></div></aside></section>
+            <section v-if="settingsTab === 'security'" class="settings-section"><div class="settings-section-heading"><h3>Change password</h3><p>Use at least twelve characters and keep this password private.</p></div><form class="settings-form password-settings-form" @submit.prevent="changePassword"><label>Current password <input v-model="passwordChange.currentPassword" type="password" aria-label="Current password" autocomplete="current-password" required /></label><label>New password <input v-model="passwordChange.newPassword" type="password" aria-label="New password" autocomplete="new-password" minlength="12" required /></label><label>Confirm new password <input v-model="passwordChange.confirmPassword" type="password" aria-label="Confirm new password" autocomplete="new-password" minlength="12" required /></label><p v-if="passwordChangeError" class="settings-error">{{ passwordChangeError }}</p><p v-if="passwordChangeNotice" class="settings-notice" role="status">{{ passwordChangeNotice }}</p><button :disabled="changingPassword">{{ changingPassword ? 'Updating...' : 'Update password' }}</button></form></section>
+            <template v-if="settingsTab === 'admin' && user?.role === 'admin'">
+              <section class="settings-section"><div class="settings-section-heading"><h3>Platform settings</h3><p>Managed by deployment configuration and shown without secrets.</p></div><div v-if="platformSettings" class="platform-settings"><div><span>Runtime</span><strong>{{ platformSettings.runtime }}</strong></div><div><span>Password sign-in</span><strong>{{ platformSettings.authentication.passwordEnabled ? 'Enabled' : 'Disabled' }}</strong></div><div><span>Single sign-on</span><strong>{{ platformSettings.authentication.oidcConfigured ? 'Configured' : 'Not configured' }}</strong></div><div><span>Session signing</span><strong>{{ platformSettings.authentication.sessionSecretConfigured ? 'Configured' : 'Development default' }}</strong></div><div><span>AI search</span><strong>{{ platformSettings.integrations.aiEnabled ? 'Enabled' : 'Disabled' }}</strong></div><div><span>AI credential</span><strong>{{ platformSettings.integrations.aiCredentialConfigured ? 'Configured' : 'Not configured' }}</strong></div><div><span>Queue service</span><strong>{{ platformSettings.integrations.queueConfigured ? 'Configured' : 'Not configured' }}</strong></div><div><span>Media storage</span><strong>{{ platformSettings.storage.mediaStorageConfigured ? 'Configured' : 'Not configured' }}</strong></div></div></section>
+              <section class="settings-section"><div class="settings-section-heading"><h3>Create local user</h3><p>Create a password-based account. Adding an email allows verified SSO to link to this account.</p></div><form class="settings-form" @submit.prevent="createLocalUser"><label>Username <input v-model="newLocalUser.username" aria-label="New username" autocomplete="off" required /></label><label>Email <input v-model="newLocalUser.email" type="email" aria-label="New user email" placeholder="user@example.com" /></label><label>Password <input v-model="newLocalUser.password" type="password" aria-label="New user password" autocomplete="new-password" minlength="12" required /></label><label>Role <select v-model="newLocalUser.role" aria-label="New user role"><option value="user">User</option><option value="admin">Admin</option></select></label><p v-if="userManagementError" class="settings-error">{{ userManagementError }}</p><button :disabled="creatingUser">{{ creatingUser ? 'Creating...' : 'Create user' }}</button></form></section>
+              <section class="settings-section"><div class="settings-section-heading"><h3>Users</h3><p>Manage account roles. Changes take effect on the user’s next request.</p></div><p v-if="userManagementError" class="settings-error">{{ userManagementError }}</p><div class="user-management"><div v-for="managedUser in managedUsers" :key="managedUser.id" class="managed-user"><span><strong>{{ managedUser.username }}</strong><small>{{ managedUser.email || 'No email address' }} · {{ managedUser.timezone }}</small></span><select v-model="managedUser.role" :aria-label="`${managedUser.username} role`"><option value="user">User</option><option value="admin">Admin</option></select><button :disabled="managingUserId === managedUser.id" @click="saveUserRole(managedUser)">{{ managingUserId === managedUser.id ? 'Saving...' : 'Save role' }}</button></div></div></section>
+            </template>
+          </div>
+        </div>
       </article>
       <article v-else-if="view === 'notes'" class="empty"><h2>No note selected</h2><button @click="createNote(null)">Create note</button></article>
+      <div v-if="exportHiddenConfirmOpen" class="confirm-backdrop" role="presentation"><section class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="export-hidden-title"><h2 id="export-hidden-title">Hidden text will be included</h2><p>This document contains hidden text. Exporting to PDF will reveal that hidden content in the exported file.</p><div><button class="quiet" @click="exportHiddenConfirmOpen = false">Cancel</button><button @click="confirmExportWithHidden">Export anyway</button></div></section></div>
       <div v-if="user.forcePasswordChange" class="confirm-backdrop">
         <form class="confirm-dialog password-change-dialog" aria-labelledby="password-change-title" @submit.prevent="changePassword">
           <h2 id="password-change-title">Choose a new password</h2>
@@ -478,10 +494,11 @@ import CodeBlockView from './components/CodeBlockView.vue';
 import { HiddenText } from './extensions/HiddenText';
 import hljs from 'highlight.js';
 import MarkdownIt from 'markdown-it';
+import html2pdf from 'html2pdf.js';
 import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ArrowUpRight, BarChart3, Bold, Book, BookOpen, Calendar, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, Code2, FileText, GripVertical, Heading2, Highlighter, HelpCircle, Home, ImagePlus, Italic, LayoutGrid, Library, Link2, List, ListChecks, Menu, MessageSquare, Moon, PanelLeft, Plus, Quote, Redo2, Replace, Rows3, Search, Settings, Sparkles, Star, Strikethrough, Subscript as SubscriptIcon, Superscript as SuperscriptIcon, Sun, Trash2, Underline as UnderlineIcon, Undo2, X } from '@lucide/vue';
 
 type User = { id: string; username: string; displayName: string | null; role: string; timezone: string; forcePasswordChange: boolean };
-type UserSettings = { username: string; displayName: string | null; email: string | null; role: string; timezone: string; assistantPrompt: string; briefingPrompt: string };
+type UserSettings = { username: string; displayName: string | null; email: string | null; role: string; timezone: string; assistantPrompt: string; briefingPrompt: string; journalTemplate: string | null; journalTemplateVersion: number };
 type PlatformSettings = { runtime: string; authentication: { passwordEnabled: boolean; oidcConfigured: boolean; sessionSecretConfigured: boolean }; integrations: { aiEnabled: boolean; aiCredentialConfigured: boolean; queueConfigured: boolean }; storage: { mediaStorageConfigured: boolean } };
 type ManagedUser = { id: string; username: string; email: string | null; role: 'admin' | 'user'; enabled: boolean; timezone: string; createdAt: string };
 type Note = { id: string; title: string; bodyMarkdown: string; version: number; updatedAt: string; period?: string; notebookId?: string | null; tags?: string[]; archived?: boolean };
@@ -493,6 +510,7 @@ type LibraryCard = { type: LibraryItemType; id: string; title: string; icon: str
 type LibraryTreeNote = { id: string; notebookId: string | null; title: string; updatedAt: string };
 type ExtractedTask = { title: string; dueDate?: string; selected: boolean };
 type DocumentVersion = { id: string; versionN: number; title: string | null; source: string; createdAt: string };
+type JournalTemplateVersion = { id: string; versionN: number; bodyMarkdown: string; source: string; createdAt: string };
 type Journal = { id: string; journalDate: string; bodyMarkdown: string; version: number; updatedAt: string; suggestedCarryForward?: { suggestions?: string[] } };
 type Task = { id: string; title: string; status: 'todo' | 'doing' | 'done' | 'cancelled' };
 type SearchHit = AssistantSearchHit;
@@ -543,6 +561,7 @@ const suggestedTags = ref<string[]>([]);
 const selectionRewriteOpen = ref(false);
 const selectionRewriteText = ref('');
 const selectionRewriteRange = ref<{ from: number; to: number } | null>(null);
+const rewriteTarget = ref<'note' | 'journal'>('note');
 const rewriteStyle = ref('Improve clarity and concision.');
 const rewriteInstruction = ref('');
 const selectionRewriteSuggestion = ref('');
@@ -648,8 +667,7 @@ Answer the user by synthesizing the relevant facts into a direct, practical resp
 - Do not explain your process unless asked.`;
 const defaultBriefingPrompt = `You are a personal daily briefing assistant.
 
-Your only job is to produce a short Markdown briefing titled for the current date:
-# Daily briefing — YYYY-MM-DD
+Your only job is to produce a short Markdown briefing for the current date. The date and title are shown separately in the application, so do not include a title or date heading in your output.
 
 Use ONLY the journals, notes, and open tasks provided in this conversation. Do not invent tasks, people, deadlines, or context. If a source is thin, incomplete, or silent, say so briefly instead of filling gaps.
 
@@ -687,12 +705,42 @@ Do not explain your process, list assumptions, or add a preamble. Output only th
 - Omit this section if empty.
 
 If a section has no items, omit the section rather than writing "none," except when the entire briefing has nothing to report.`;
-const userSettings = ref<UserSettings>({ username: '', displayName: null, email: null, role: '', timezone: '', assistantPrompt: defaultAssistantPrompt, briefingPrompt: defaultBriefingPrompt });
+const userSettings = ref<UserSettings>({ username: '', displayName: null, email: null, role: '', timezone: '', assistantPrompt: defaultAssistantPrompt, briefingPrompt: defaultBriefingPrompt, journalTemplate: null, journalTemplateVersion: 1 });
+const briefingDate = computed(() => {
+  const dateKey = briefing.value?.title.match(/(\d{4}-\d{2}-\d{2})/)?.[1];
+  return formatJournalDate(dateKey ?? new Date().toISOString());
+});
+const briefingBodyMarkdown = computed(() => briefing.value?.bodyMarkdown.replace(/^#\s+Daily briefing\s+[—-]\s+\d{4}-\d{2}-\d{2}\s*\n+/i, '') ?? '');
 const platformSettings = ref<PlatformSettings | null>(null);
 const aiSearchEnabled = computed(() => platformSettings.value?.integrations.aiEnabled !== false);
 const savingSettings = ref(false);
 const settingsError = ref('');
 const settingsNotice = ref('');
+const settingsTab = ref<'account' | 'ai' | 'journal' | 'security' | 'admin'>('account');
+const defaultJournalTemplate = `## Carry forward
+
+- 
+
+## Today's focus
+
+- 
+
+## Notes
+
+
+## Tasks
+
+- [ ] 
+
+## Wins / notes to future me
+
+`;
+const journalTemplateDraft = ref('');
+const savingJournalTemplate = ref(false);
+const journalTemplateError = ref('');
+const journalTemplateNotice = ref('');
+const journalTemplateVersions = ref<JournalTemplateVersion[]>([]);
+const journalTemplateVersionsOpen = ref(false);
 const managedUsers = ref<ManagedUser[]>([]);
 const managingUserId = ref<string | null>(null);
 const userManagementError = ref('');
@@ -709,6 +757,9 @@ const journalArchiveMonth = ref<string | null>(null);
 const versions = ref<DocumentVersion[]>([]);
 const versionsOpen = ref(false);
 const deleteConfirmOpen = ref(false);
+const exportingPdf = ref(false);
+const exportHiddenConfirmOpen = ref(false);
+const exportPdfTarget = ref<'note' | 'journal' | 'briefing' | null>(null);
 const editorDark = ref(false);
 const searchReplaceOpen = ref(false);
 const findText = ref('');
@@ -890,7 +941,7 @@ function resetWorkspaceState() {
   journalAssistantConversationId.value = null;
   autocompleteHits.value = [];
   autocompleteOpen.value = false;
-  userSettings.value = { username: '', displayName: null, email: null, role: '', timezone: '', assistantPrompt: defaultAssistantPrompt, briefingPrompt: defaultBriefingPrompt };
+  userSettings.value = { username: '', displayName: null, email: null, role: '', timezone: '', assistantPrompt: defaultAssistantPrompt, briefingPrompt: defaultBriefingPrompt, journalTemplate: null, journalTemplateVersion: 1 };
   platformSettings.value = null;
   managedUsers.value = [];
   tasks.value = [];
@@ -2101,6 +2152,10 @@ async function openSettings(updateRoute = true) {
   if (response.ok) {
     const settings = (await response.json() as { settings: Omit<UserSettings, 'assistantPrompt' | 'briefingPrompt'> & { assistantPrompt: string | null; briefingPrompt: string | null } }).settings;
     userSettings.value = { ...settings, assistantPrompt: settings.assistantPrompt || defaultAssistantPrompt, briefingPrompt: settings.briefingPrompt || defaultBriefingPrompt };
+    journalTemplateDraft.value = settings.journalTemplate ?? '';
+    journalTemplateError.value = '';
+    journalTemplateNotice.value = '';
+    journalTemplateVersionsOpen.value = false;
   }
   if (user.value?.role === 'admin') {
     const platformResponse = await fetch('/api/v1/settings/platform', { credentials: 'include' });
@@ -2126,6 +2181,55 @@ async function saveUserSettings() {
     settingsError.value = error instanceof Error ? error.message : 'Unable to save settings';
   } finally {
     savingSettings.value = false;
+  }
+}
+
+async function saveJournalTemplate() {
+  savingJournalTemplate.value = true;
+  journalTemplateError.value = '';
+  journalTemplateNotice.value = '';
+  try {
+    const response = await fetch('/api/v1/settings/journal-template', { method: 'PATCH', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ journalTemplate: journalTemplateDraft.value }) });
+    const body = await response.json() as { journalTemplate?: string | null; journalTemplateVersion?: number; error?: string };
+    if (!response.ok) throw new Error(body.error ?? 'Unable to save journal template');
+    journalTemplateDraft.value = body.journalTemplate ?? '';
+    userSettings.value = { ...userSettings.value, journalTemplate: body.journalTemplate ?? null, journalTemplateVersion: body.journalTemplateVersion ?? userSettings.value.journalTemplateVersion };
+    journalTemplateNotice.value = 'Journal template saved.';
+    if (journalTemplateVersionsOpen.value) await loadJournalTemplateVersions();
+  } catch (error) {
+    journalTemplateError.value = error instanceof Error ? error.message : 'Unable to save journal template';
+  } finally {
+    savingJournalTemplate.value = false;
+  }
+}
+
+function resetJournalTemplate() {
+  journalTemplateDraft.value = '';
+  void saveJournalTemplate();
+}
+
+async function loadJournalTemplateVersions() {
+  const response = await fetch('/api/v1/settings/journal-template/versions', { credentials: 'include' });
+  if (response.ok) journalTemplateVersions.value = (await response.json() as { versions: JournalTemplateVersion[] }).versions;
+}
+
+async function toggleJournalTemplateVersions() {
+  journalTemplateVersionsOpen.value = !journalTemplateVersionsOpen.value;
+  if (journalTemplateVersionsOpen.value) await loadJournalTemplateVersions();
+}
+
+async function restoreJournalTemplateVersion(versionId: string) {
+  journalTemplateError.value = '';
+  try {
+    const response = await fetch(`/api/v1/settings/journal-template/versions/${versionId}/restore`, { method: 'POST', credentials: 'include' });
+    const body = await response.json() as { journalTemplate?: string | null; journalTemplateVersion?: number; error?: string };
+    if (!response.ok) throw new Error(body.error ?? 'Unable to restore version');
+    journalTemplateDraft.value = body.journalTemplate ?? '';
+    userSettings.value = { ...userSettings.value, journalTemplate: body.journalTemplate ?? null, journalTemplateVersion: body.journalTemplateVersion ?? userSettings.value.journalTemplateVersion };
+    journalTemplateNotice.value = 'Journal template restored.';
+    await loadJournalTemplateVersions();
+  } catch (error) {
+    journalTemplateError.value = error instanceof Error ? error.message : 'Unable to restore version';
   }
 }
 
@@ -2223,6 +2327,13 @@ function normalizedNoteTags() {
   return [...new Set(noteTagsInput.value.split(',').map((tag) => tag.trim().toLowerCase()).filter(Boolean))].slice(0, 20);
 }
 
+const noteTagsList = computed(() => normalizedNoteTags());
+
+function removeNoteTag(tag: string) {
+  noteTagsInput.value = noteTagsList.value.filter((item) => item !== tag).join(', ');
+  void saveNoteOrganization();
+}
+
 async function saveNoteOrganization() {
   const note = activeNote.value;
   if (!note) return;
@@ -2312,12 +2423,15 @@ async function saveTagModal() {
   if (!libraryError.value) tagModalOpen.value = false;
 }
 
-function openSelectionRewriteModal() {
-  const note = activeNote.value;
-  const selection = editor.value?.state.selection;
-  if (!note || !selection || selection.empty) return;
+function openSelectionRewriteModal(target: 'note' | 'journal') {
+  const targetEditor = target === 'note' ? editor.value : journalEditor.value;
+  if (target === 'note' && !activeNote.value) return;
+  if (target === 'journal' && !journal.value) return;
+  const selection = targetEditor?.state.selection;
+  if (!selection || selection.empty) return;
+  rewriteTarget.value = target;
   selectionRewriteRange.value = { from: selection.from, to: selection.to };
-  selectionRewriteText.value = editor.value?.state.doc.textBetween(selection.from, selection.to, '\n') ?? '';
+  selectionRewriteText.value = targetEditor?.state.doc.textBetween(selection.from, selection.to, '\n') ?? '';
   selectionRewriteSuggestion.value = '';
   aiError.value = '';
   selectionRewriteOpen.value = Boolean(selectionRewriteText.value.trim());
@@ -2325,12 +2439,17 @@ function openSelectionRewriteModal() {
 
 async function requestSelectionRewrite() {
   const note = activeNote.value;
-  if (!note || !selectionRewriteText.value) return;
+  const entry = journal.value;
+  if (!selectionRewriteText.value) return;
+  const endpoint = rewriteTarget.value === 'note'
+    ? (note ? `/api/v1/notes/${note.id}/suggest-selection-rewrite` : null)
+    : (entry ? `/api/v1/journals/${entry.journalDate.slice(0, 10)}/suggest-selection-rewrite` : null);
+  if (!endpoint) return;
   aiLoading.value = 'rewrite';
   aiError.value = '';
   try {
     const instruction = [rewriteStyle.value, rewriteInstruction.value.trim()].filter(Boolean).join(' ');
-    const response = await fetch(`/api/v1/notes/${note.id}/suggest-selection-rewrite`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ selectedText: selectionRewriteText.value, instruction }) });
+    const response = await fetch(endpoint, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ selectedText: selectionRewriteText.value, instruction }) });
     const body = await response.json() as { suggestion?: string; error?: string };
     if (!response.ok || !body.suggestion) throw new Error(body.error ?? 'Unable to generate a rewrite');
     selectionRewriteSuggestion.value = body.suggestion;
@@ -2343,11 +2462,66 @@ async function requestSelectionRewrite() {
 
 function applySelectionRewrite() {
   const range = selectionRewriteRange.value;
-  if (!range || !selectionRewriteSuggestion.value || !editor.value) return;
-  editor.value.chain().focus().setTextSelection(range).insertContent(selectionRewriteSuggestion.value).run();
+  const targetEditor = rewriteTarget.value === 'note' ? editor.value : journalEditor.value;
+  if (!range || !selectionRewriteSuggestion.value || !targetEditor) return;
+  targetEditor.chain().focus().setTextSelection(range).insertContent(selectionRewriteSuggestion.value).run();
   selectionRewriteOpen.value = false;
   selectionRewriteSuggestion.value = '';
   selectionRewriteRange.value = null;
+}
+
+function requestExportPdf(target: 'note' | 'journal' | 'briefing') {
+  if (target === 'briefing') {
+    if (!briefing.value) return;
+    void exportToPdf(target);
+    return;
+  }
+  const targetEditor = target === 'note' ? editor.value : journalEditor.value;
+  if (!targetEditor) return;
+  if (targetEditor.getHTML().includes('data-hidden-text')) {
+    exportPdfTarget.value = target;
+    exportHiddenConfirmOpen.value = true;
+    return;
+  }
+  void exportToPdf(target);
+}
+
+function confirmExportWithHidden() {
+  exportHiddenConfirmOpen.value = false;
+  if (exportPdfTarget.value) void exportToPdf(exportPdfTarget.value);
+  exportPdfTarget.value = null;
+}
+
+async function exportToPdf(target: 'note' | 'journal' | 'briefing') {
+  const targetEditor = target === 'note' ? editor.value : target === 'journal' ? journalEditor.value : null;
+  const note = target === 'note' ? activeNote.value : null;
+  const entry = target === 'journal' ? journal.value : null;
+  const briefingNote = target === 'briefing' ? briefing.value : null;
+  if ((target !== 'briefing' && (!targetEditor || (!note && !entry))) || (target === 'briefing' && !briefingNote)) return;
+  const title = note ? (note.title || 'Untitled note') : entry ? formatJournalDate(entry.journalDate) : `Daily briefing - ${formatJournalDate(new Date().toISOString())}`;
+  const lastModified = new Date((note ?? entry ?? briefingNote)!.updatedAt).toLocaleString();
+
+  const container = document.createElement('div');
+  container.style.cssText = 'font-family: -apple-system, Segoe UI, sans-serif; color: #26312c; padding: 0.5rem;';
+  const style = document.createElement('style');
+  style.textContent = '[data-hidden-text] { color: inherit !important; text-shadow: none !important; }';
+  const heading = document.createElement('h1');
+  heading.style.cssText = 'font-size: 1.4rem; margin: 0 0 1rem;';
+  heading.textContent = title;
+  const body = document.createElement('div');
+  body.innerHTML = targetEditor ? targetEditor.getHTML() : markdown.render(briefingBodyMarkdown.value);
+  const footer = document.createElement('div');
+  footer.style.cssText = 'margin-top: 2rem; padding-top: 0.5rem; border-top: 1px solid #ddd; color: #888; font-size: 0.75rem;';
+  footer.textContent = `Last modified: ${lastModified}`;
+  container.append(style, heading, body, footer);
+
+  exportingPdf.value = true;
+  try {
+    const filename = `${title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'export'}.pdf`;
+    await html2pdf().set({ margin: 12, filename, html2canvas: { scale: 2 }, jsPDF: { unit: 'pt', format: 'letter' } }).from(container).save();
+  } finally {
+    exportingPdf.value = false;
+  }
 }
 
 async function deleteNote() {
@@ -2624,6 +2798,7 @@ input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; color:
 .tiptap-editor .prose-editor ul[data-type='taskList'] li > div { min-width: 0; flex: 1; }
 .tiptap-editor .prose-editor ul[data-type='taskList'] li > div > p { margin: 0; }
 .versions { position: fixed; inset: 1.5rem 1.5rem 1.5rem auto; z-index: 4; width: min(25rem, calc(100vw - 3rem)); overflow-y: auto; padding: 1.25rem; border: 1px solid #e3e4e7; border-radius: 9px; background: #fff; box-shadow: 0 14px 36px #59616d1f; color: #45474e; }
+.versions.inline-versions { position: static; inset: auto; z-index: auto; width: 100%; margin-top: 1rem; box-shadow: none; }
 .versions header { display: flex; justify-content: space-between; align-items: center; }
 .versions h2 { margin: 0; color: #313238; font-size: 0.95rem; }
 .versions header button, .version button { padding: 0.4rem 0.55rem; border: 1px solid #e1e2e5; border-radius: 6px; color: #666a73; background: #fff; font-size: 0.7rem; }
@@ -2654,7 +2829,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .search-autocomplete { position: absolute; top: calc(100% + 0.4rem); right: 0; left: 0; z-index: 5; overflow: hidden; border: 1px solid #e3e4e7; border-radius: 9px; background: #fff; box-shadow: 0 10px 26px #59616d1a; }
 .search-autocomplete button { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr); gap: 0.45rem; align-items: center; width: 100%; padding: 0.6rem 0.7rem; border-radius: 0; color: #777b83; background: #fff; text-align: left; }
 .search-autocomplete button + button { border-top: 1px solid #f0f0f2; }.search-autocomplete button:hover { color: #45474e; background: #faf9ff; }.search-autocomplete strong, .search-autocomplete small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.search-autocomplete strong { color: #45474e; font-size: 0.72rem; }.search-autocomplete small { margin-top: 0.14rem; color: #a0a2a8; font-size: 0.63rem; text-transform: capitalize; }
-.workspace > aside.app-sidebar { box-sizing: border-box; min-height: calc(100vh - 3rem); margin: 1.5rem 0 1.5rem 1.5rem; padding: 1.05rem 0.7rem 0.8rem; border: 1px solid #e4e5e7; border-radius: 14px; background: #fff; color: #70747c; box-shadow: 0 5px 22px #59616d0c; }
+.workspace > aside.app-sidebar { box-sizing: border-box; min-height: calc(100vh - 3rem); margin: 0.5rem 0 0.5rem 0.5rem; padding: 1.05rem 0.7rem 0.8rem; border: 1px solid #e4e5e7; border-radius: 14px; background: #fff; color: #70747c; box-shadow: 0 5px 22px #59616d0c; }
 .sidebar-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 0.2rem 1.15rem; border-bottom: 1px solid #eeeff1; }
 .sidebar-heading > .brand { display: flex; align-items: center; gap: 0.55rem; padding: 0; color: #222327; background: transparent; font-size: 0.93rem; font-weight: 700; }
 .brand-mark { display: grid; width: 1.35rem; height: 1.35rem; place-items: center; border-radius: 0.35rem; color: #fff; background: #8b5cf6; font-size: 0.75rem; font-weight: 800; }
@@ -2684,7 +2859,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .sidebar-collapsed .library-tree { max-height: none; }
 .sidebar-collapsed .tree-twisty, .sidebar-collapsed .tree-add, .sidebar-collapsed .tree-children { display: none; }
 
-.library-view { display: flex; flex-direction: column; gap: 1.25rem; padding: 2.25rem clamp(1.25rem, 5vw, 4rem); overflow-y: auto; }
+.library-view { display: flex; flex-direction: column; gap: 1.25rem; padding: 1.5rem 1.5rem 1rem; overflow-y: auto; }
 .library-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
 .library-header.has-cover { position: relative; align-items: flex-end; min-height: 9.5rem; padding: 1.4rem 1.5rem; border-radius: 14px; overflow: hidden; color: #fff; }
 .library-header.has-cover::before { content: ''; position: absolute; inset: 0; background-image: var(--library-cover); background-size: cover; background-position: center; }
@@ -2750,7 +2925,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .profile-card strong { font-size: 0.72rem; }
 .profile-card small { margin-top: 0.12rem; color: #9a9da4; font-size: 0.62rem; }
 .profile-chevron { color: #9a9da4; font-size: 0.65rem; }
-.home-view { min-width: 0; padding: 2.5rem 3.5rem 3rem; }
+.home-view { min-width: 0; padding: 1.5rem 1.5rem 1rem; }
 .home-content { width: 100%; margin: 0 auto; }
 .welcome-block { margin: 0 auto 1.65rem; text-align: center; }
 .welcome-block .eyebrow { margin-bottom: 0.65rem; color: #8b5cf6; font-family: inherit; font-size: 0.67rem; letter-spacing: 0.1em; }
@@ -2788,9 +2963,9 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 
 /* Shared secondary-page surfaces */
 .editor, .tasks, .empty { box-sizing: border-box; width: 100%; margin: 0 auto; max-width: none; color: #34363b; }
-.editor, .tasks { display: block; position: relative; width: auto; margin: 2.5rem 3.5rem 3rem; padding: 0 0 1.5rem; border: 1px solid #e5e6e8; border-radius: 9px; background: #fff; box-shadow: 0 5px 18px #59616d0a; }
+.editor, .tasks { display: block; position: relative; width: auto; margin: 1.5rem 1.5rem 1rem; padding: 0 0 1.5rem; border: 1px solid #e5e6e8; border-radius: 9px; background: #fff; box-shadow: 0 5px 18px #59616d0a; }
 .workspace > article.editor { border-radius: 9px; }
-.editor > header, .tasks > header { min-height: 2.8rem; flex-wrap: wrap; margin-bottom: 1.15rem; padding: 1.5rem clamp(1.25rem, 4vw, 3.5rem) 0.85rem; border-bottom: 1px solid #e5e6e8; border-radius: 8px 8px 0 0; background: #fff; }
+.editor > header, .tasks > header { min-height: 2.8rem; flex-wrap: wrap; margin-bottom: 1.15rem; padding: 1rem; border-bottom: 1px solid #e5e6e8; border-radius: 8px 8px 0 0; background: #fff; }
 .editor header input, .editor header strong, .tasks h2 { color: #24252a; font-size: 1.55rem; font-weight: 650; letter-spacing: -0.02em; }
 .editor :is(input, button, .prose-editor):focus-visible { outline: none; }
 .save-status { margin-left: auto; color: #999ca3; font-size: 0.67rem; }
@@ -2822,7 +2997,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .search-replace-panel button:hover { color: #7650dc; border-color: #c9baf8; background: #faf9ff; }
 .tiptap-editor { min-height: 32rem; padding: 0; border: 0; border-radius: 0 0 8px 8px; background: #fff; box-shadow: none; margin: 0; }
 .editor > .upload-control { display: none; }
-.tiptap-editor .prose-editor { box-sizing: border-box; width: 100%; min-height: 32rem; margin: 0; padding: 3rem clamp(1rem, 5vw, 4rem) clamp(2rem, 5vw, 4rem); color: #404249; font-size: 0.95rem; line-height: 1.75; }
+.tiptap-editor .prose-editor { box-sizing: border-box; width: 100%; min-height: 32rem; margin: 0; padding: 1rem; color: #404249; font-size: 0.95rem; line-height: 1.75; }
 .tiptap-editor .prose-editor pre { overflow-x: auto; margin: 1.25rem 0; padding: 1rem 1.15rem; border: 1px solid #343b4a; border-radius: 7px; background: #20242d; box-shadow: 0 3px 9px #1c1d211f; color: #d9e1ee; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.82rem; line-height: 1.65; }
 .tiptap-editor .prose-editor pre code { display: block; padding: 0; border: 0; border-radius: 0; color: inherit; background: transparent; font: inherit; }
 .tiptap-editor .prose-editor .hljs-keyword, .tiptap-editor .prose-editor .hljs-selector-tag, .tiptap-editor .prose-editor .hljs-literal { color: #d4a8ff; }.tiptap-editor .prose-editor .hljs-string, .tiptap-editor .prose-editor .hljs-attr { color: #a8d89d; }.tiptap-editor .prose-editor .hljs-number, .tiptap-editor .prose-editor .hljs-built_in { color: #f0c674; }.tiptap-editor .prose-editor .hljs-title, .tiptap-editor .prose-editor .hljs-function { color: #7fcbff; }.tiptap-editor .prose-editor .hljs-comment { color: #87909f; font-style: italic; }
@@ -2872,7 +3047,13 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .search-result:first-of-type { border-radius: 9px 9px 0 0; }.search-result:last-of-type { border-bottom: 1px solid #e5e6e8; border-radius: 0 0 9px 9px; }
 .search-result:only-of-type { border-radius: 9px; }.search-result:hover { border-color: #ddd3ff; background: #faf9ff; }.search-result strong { display: block; font-size: 0.78rem; }.search-result p { margin: 0.35rem 0 0 !important; color: #858991; font-size: 0.74rem; line-height: 1.55; }
 .assistant-view { display: flex; min-height: 34rem; flex-direction: column; }.assistant-layout { display: grid; grid-template-columns: 15rem minmax(0, 1fr); flex: 1; gap: 1.5rem; min-height: 0; }.assistant-history { display: grid; align-content: start; gap: 0.4rem; max-height: calc(100vh - 14rem); padding-right: 0.2rem; overflow-y: auto; }.assistant-history-item { display: flex; gap: 0.4rem; align-items: center; justify-content: space-between; padding: 0.55rem 0.65rem; border: 1px solid #e5e6e8; border-radius: 7px; background: #fff; cursor: pointer; }.assistant-history-item:hover { border-color: #ddd3ff; background: #faf9ff; }.assistant-history-item.active { border-color: #c9baf8; background: #f2efff; }.assistant-history-text { display: grid; min-width: 0; gap: 0.15rem; }.assistant-history-text strong { overflow: hidden; color: #313238; font-size: 0.78rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }.assistant-history-text small { color: #92959c; font-size: 0.68rem; }.assistant-history-delete { display: grid; flex: 0 0 auto; width: 1.5rem; height: 1.5rem; place-items: center; padding: 0; border-radius: 5px; color: #a0a2a8; background: transparent; }.assistant-history-delete:hover { color: #b64b42; background: #fbeceb; }.assistant-main { display: flex; min-width: 0; flex-direction: column; }.assistant-empty { display: grid; min-height: 20rem; place-content: center; justify-items: center; gap: 0.55rem; color: #a0a2a8; text-align: center; }.assistant-empty svg { color: #8255ec; }.assistant-empty p { margin: 0; font-size: 0.82rem; }.assistant-starters { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.45rem; margin-top: 0.4rem; max-width: 30rem; }.assistant-starter { display: flex; align-items: center; gap: 0.4rem; }.assistant-starter svg { flex: 0 0 auto; color: #8255ec; }.assistant-followups { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }.assistant-choices-hint { margin: 0; color: #9a9ea8; font-size: 0.68rem; font-style: italic; }.assistant-messages { display: grid; gap: 0.85rem; max-width: 48rem; margin-bottom: 1rem !important; }.assistant-message { width: fit-content; max-width: min(100%, 42rem); padding: 0.7rem 0.85rem; border-radius: 8px; color: #4b4d54; background: #f6f6f7; font-size: 0.82rem; line-height: 1.6; }.assistant-message.user { justify-self: end; color: #fff; background: #8b5cf6; }.assistant-message p { margin: 0; white-space: pre-wrap; }.assistant-markdown > :first-child { margin-top: 0; }.assistant-markdown > :last-child { margin-bottom: 0; }.assistant-markdown p { margin: 0.45rem 0; }.assistant-markdown pre { overflow-x: auto; padding: 0.65rem; border-radius: 6px; background: #262733; color: #f5f5f7; }.assistant-markdown code { font-family: ui-monospace, monospace; }.assistant-markdown li + li { margin-top: 0.2rem; }.assistant-message small { display: block; margin-top: 0.55rem; color: #92959c; font-size: 0.66rem; line-height: 1.45; }.assistant-message.user small { color: #eee9ff; }.assistant-thinking { color: #92959c; font-size: 0.74rem; }.assistant-markdown a[href^="assistant-source:"] { color: #7650dc; font-weight: 600; text-decoration: none; border-bottom: 1px dashed #c4a9ff; cursor: pointer; }.assistant-markdown a[href^="assistant-source:"]:hover { color: #5a2fc2; border-bottom-style: solid; }.assistant-tool-calls { display: grid; gap: 0.3rem; margin-bottom: 0.5rem; }.assistant-tool-call { display: inline-flex; width: fit-content; gap: 0.35rem; align-items: center; padding: 0.25rem 0.55rem; border-radius: 999px; color: #7650dc; background: #f2efff; font-size: 0.68rem; }.assistant-tool-call.running { color: #92959c; background: #eceef0; }.assistant-tool-call.failed { color: #b64b42; background: #fbeceb; }.assistant-tool-call.linkable { cursor: pointer; }.assistant-tool-call.linkable:hover { background: #e4dbff; }.assistant-tool-call .spin { animation: assistant-spin 0.9s linear infinite; }@keyframes assistant-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }.assistant-composer { display: flex; position: sticky; bottom: 1rem; gap: 0.5rem; align-items: center; margin-top: auto !important; padding: 0.55rem; border: 1px solid #e3e4e7; border-radius: 9px; background: #fff; box-shadow: 0 5px 18px #59616d0a; z-index: 3; }.assistant-composer input { min-width: 0; flex: 1; padding: 0.5rem 0.6rem; border: 0; background: transparent; color: #34363b; font-size: 0.8rem; }.assistant-composer button { display: grid; width: 2rem; height: 2rem; place-items: center; padding: 0; border-radius: 6px; color: #fff; background: #8b5cf6; }.assistant-composer button:hover { background: #7650dc; }.assistant-composer button:disabled { cursor: wait; opacity: 0.6; }
-.settings-section { margin-top: 1.25rem; padding: 1.1rem; border: 1px solid #e3e4e7; border-radius: 9px; background: #fff; box-shadow: 0 5px 18px #59616d0a; }.settings-section-heading h3 { margin: 0; color: #313238; font-size: 0.88rem; }.settings-section-heading p { margin: 0.3rem 0 1rem; color: #92959c; font-size: 0.74rem; }.settings-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }.settings-form label { color: #666a73; font-size: 0.72rem; }.settings-form input, .settings-form select, .settings-form textarea { width: 100%; border: 1px solid #e0e2e5; border-radius: 6px; background: #fff; color: #45474e; font-size: 0.78rem; }.settings-form textarea { min-height: 6rem; resize: vertical; line-height: 1.5; }.assistant-prompt-field { grid-column: 1 / -1; }.settings-form input[readonly] { color: #92959c; background: #fafafa; }.settings-form button { width: fit-content; padding: 0.55rem 0.8rem; border-radius: 6px; color: #fff; background: #8b5cf6; font-size: 0.72rem; font-weight: 650; }.settings-form button:hover { background: #7650dc; }.settings-form button:disabled { cursor: wait; opacity: 0.7; }.settings-error, .settings-notice { grid-column: 1 / -1; margin: 0; font-size: 0.72rem; }.settings-error { color: #b64b42; }.settings-notice { color: #31776b; }.platform-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid #ececef; border-radius: 7px; }.platform-settings > div { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.65rem 0.75rem; border-bottom: 1px solid #ececef; color: #777b83; font-size: 0.72rem; }.platform-settings > div:nth-last-child(-n + 2) { border-bottom: 0; }.platform-settings > div:nth-child(odd) { border-right: 1px solid #ececef; }.platform-settings span { color: #92959c; }.platform-settings strong { color: #45474e; font-weight: 650; text-align: right; }.user-management { overflow: hidden; border: 1px solid #ececef; border-radius: 7px; }.managed-user { display: grid; grid-template-columns: minmax(0, 1fr) 7rem 5.5rem; gap: 0.65rem; align-items: center; padding: 0.7rem 0.75rem; border-bottom: 1px solid #ececef; }.managed-user:last-child { border-bottom: 0; }.managed-user strong, .managed-user small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.managed-user strong { color: #45474e; font-size: 0.78rem; }.managed-user small { margin-top: 0.16rem; color: #92959c; font-size: 0.67rem; }.managed-user select { padding: 0.45rem 0.5rem; border: 1px solid #e1e2e5; border-radius: 6px; color: #666a73; background: #fff; font-size: 0.72rem; }.managed-user button { padding: 0.45rem 0.5rem; border-radius: 6px; color: #7650dc; background: #f2efff; font-size: 0.7rem; }.managed-user button:hover { background: #e9e2ff; }.managed-user button:disabled { cursor: wait; opacity: 0.7; }
+.settings-layout { display: grid; grid-template-columns: 11rem minmax(0, 1fr); gap: 1.5rem; align-items: start; margin: 0 clamp(1.25rem, 4vw, 3.5rem); }
+.settings-nav { display: grid; gap: 0.2rem; position: sticky; top: 1.25rem; }
+.settings-nav button { padding: 0.55rem 0.7rem; border: 0; border-radius: 6px; color: #666a73; background: transparent; font-size: 0.78rem; font-weight: 600; text-align: left; cursor: pointer; }
+.settings-nav button:hover { color: #45474e; background: #f5f4f8; }
+.settings-nav button.active { color: #7650dc; background: #f2efff; }
+.settings-panels { min-width: 0; }
+.settings-section { margin-top: 1.25rem; padding: 1.1rem; border: 1px solid #e3e4e7; border-radius: 9px; background: #fff; box-shadow: 0 5px 18px #59616d0a; }.settings-section-heading h3 { margin: 0; color: #313238; font-size: 0.88rem; }.settings-section-heading p { margin: 0.3rem 0 1rem; color: #92959c; font-size: 0.74rem; }.settings-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }.settings-form label { color: #666a73; font-size: 0.72rem; }.settings-form input, .settings-form select, .settings-form textarea { width: 100%; border: 1px solid #e0e2e5; border-radius: 6px; background: #fff; color: #45474e; font-size: 0.78rem; }.settings-form textarea { min-height: 6rem; resize: vertical; line-height: 1.5; }.assistant-prompt-field { grid-column: 1 / -1; }.settings-form input[readonly] { color: #92959c; background: #fafafa; }.settings-form button { width: fit-content; padding: 0.55rem 0.8rem; border-radius: 6px; color: #fff; background: #8b5cf6; font-size: 0.72rem; font-weight: 650; }.settings-form button:hover { background: #7650dc; }.settings-form button:disabled { cursor: wait; opacity: 0.7; }.settings-form > button:not(.quiet) { grid-column: 1 / -1; justify-self: end; }.journal-template-form .dialog-actions { grid-column: 1 / -1; }.journal-template-form .dialog-actions > button:not(.quiet) { width: fit-content; padding: 0.55rem 0.8rem; font-size: 0.72rem; font-weight: 650; }.settings-error, .settings-notice { grid-column: 1 / -1; margin: 0; font-size: 0.72rem; }.settings-error { color: #b64b42; }.settings-notice { color: #31776b; }.platform-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid #ececef; border-radius: 7px; }.platform-settings > div { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.65rem 0.75rem; border-bottom: 1px solid #ececef; color: #777b83; font-size: 0.72rem; }.platform-settings > div:nth-last-child(-n + 2) { border-bottom: 0; }.platform-settings > div:nth-child(odd) { border-right: 1px solid #ececef; }.platform-settings span { color: #92959c; }.platform-settings strong { color: #45474e; font-weight: 650; text-align: right; }.user-management { overflow: hidden; border: 1px solid #ececef; border-radius: 7px; }.managed-user { display: grid; grid-template-columns: minmax(0, 1fr) 7rem 5.5rem; gap: 0.65rem; align-items: center; padding: 0.7rem 0.75rem; border-bottom: 1px solid #ececef; }.managed-user:last-child { border-bottom: 0; }.managed-user strong, .managed-user small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.managed-user strong { color: #45474e; font-size: 0.78rem; }.managed-user small { margin-top: 0.16rem; color: #92959c; font-size: 0.67rem; }.managed-user select { padding: 0.45rem 0.5rem; border: 1px solid #e1e2e5; border-radius: 6px; color: #666a73; background: #fff; font-size: 0.72rem; }.managed-user button { padding: 0.45rem 0.5rem; border-radius: 6px; color: #7650dc; background: #f2efff; font-size: 0.7rem; }.managed-user button:hover { background: #e9e2ff; }.managed-user button:disabled { cursor: wait; opacity: 0.7; }
 .journal-entry-row { display: grid; grid-template-columns: 1.8rem minmax(0, 1fr) auto; gap: 0.65rem; align-items: center; width: 100%; padding: 0.85rem 0.9rem; border: 1px solid #e5e6e8; border-bottom: 0; color: #45474e; background: #fff; text-align: left; }.journal-entry-row:first-of-type { border-radius: 9px 9px 0 0; }.journal-entry-row:last-of-type { border-bottom: 1px solid #e5e6e8; border-radius: 0 0 9px 9px; }.journal-entry-row:only-of-type { border-radius: 9px; }.journal-entry-row:hover { border-color: #ddd3ff; background: #faf9ff; }.journal-entry-row > svg { color: #8255ec; }.journal-entry-row strong, .journal-entry-row small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.journal-entry-row strong { font-size: 0.8rem; }.journal-entry-row small { margin-top: 0.2rem; color: #92959c; font-size: 0.7rem; }.journal-entry-row > svg:last-child { color: #b3b5bb; }
 .journal-entry-list { margin-top: 1rem; }
 /* Shared year/period drill-down controls, used by the journal archive and period summaries pages. */
@@ -2885,13 +3066,17 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .period-node-dot { width: 7px; height: 7px; border-radius: 999px; background: #d9d9dc; flex-shrink: 0; }
 .period-node-dot.filled { background: #8b5cf6; }
 .period-node-label { flex: 1; }
-.carry-forward-panel { padding: 1rem; border: 1px solid #ddd3ff; border-radius: 9px; background: #faf9ff; margin-bottom: 1rem; margin: 1.25rem clamp(1.25rem, 4vw, 3.5rem) 1rem; }
+.carry-forward-panel { padding: 1rem; border: 1px solid #ddd3ff; border-radius: 9px; background: #faf9ff; margin: 1.25rem 1rem 1rem; }
 .carry-forward-panel h3 { margin: 0 0 0.5rem; color: #7650dc; font-size: 0.78rem; font-family: inherit; }
 .carry-forward-toggle { display: none; }
 .assistant-composer textarea { box-sizing: border-box; width: 100%; min-width: 0; min-height: 2.45rem; max-height: 12rem; flex: 1; padding: 0.5rem 0.6rem; border: 0; outline: 0; resize: vertical; background: transparent; color: #34363b; font-size: 0.8rem; line-height: 1.45; }
-.carry-item { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid #f2e2dc; border-bottom-color: #eeeafd; font-size: 0.78rem; }
-.briefing-content { padding: 1.35rem; background: #fff; border: 1px solid #e3e4e7; border-radius: 9px; line-height: 1.75; margin: 1.5rem clamp(1.25rem, 4vw, 3.5rem) 0; color: #4b4d54; font-size: 0.88rem; box-shadow: 0 5px 18px #59616d0a; }
-.empty { margin-top: 20vh; padding: 5rem 2rem; width: auto; margin: 2.5rem 3.5rem 3rem; text-align: center; }
+.carry-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid #f2e2dc; border-bottom-color: #eeeafd; font-size: 0.78rem; }
+.carry-item > span { flex: 1; min-width: 0; }
+.carry-item > button { flex: 0 0 auto; }
+.briefing-actions { display: flex; gap: 0.45rem; }
+.briefing-date { margin-left: 0.45rem; color: #92959c; font-size: 0.75rem; font-weight: 500; }
+.briefing-content { padding: 1.35rem; background: #fff; border: 0; line-height: 1.75; margin: 0.75rem clamp(1.25rem, 4vw, 0.5rem) 0; color: #4b4d54; font-size: 0.88rem; box-shadow: none; }
+.empty { margin-top: 20vh; padding: 5rem 2rem; width: auto; margin: 1.5rem 1.5rem 1rem; text-align: center; }
 .empty h2 { color: #2b2c31; font-size: 1.3rem; }
 .empty button { padding: 0.65rem 0.9rem; border-radius: 7px; color: #fff; background: #8b5cf6; font-size: 0.75rem; }
 .auth-main { display: grid; min-height: 100vh; place-items: center; }
@@ -2914,8 +3099,19 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .login:has(.oidc-primary) .password-submit:hover { border-color: #c9baf8; color: #7650dc; background: #faf9ff; }
 .login-divider { display: flex; align-items: center; gap: 0.7rem; color: #a0a2a8; font-size: 0.68rem; }
 .login-divider::before, .login-divider::after { content: ''; height: 1px; flex: 1; background: #ececef; }
-.note-organization { display: grid; grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr); gap: 0.75rem; margin: 0 clamp(1.25rem, 4vw, 3.5rem) 1rem; }.note-organization label, .ai-panel > label { color: #666a73; font-size: 0.7rem; }.note-organization :is(select, input), .ai-panel input { width: 100%; box-sizing: border-box; border: 1px solid #e0e2e5; border-radius: 6px; background: #fff; color: #45474e; font-size: 0.76rem; }.ai-panel { display: grid; gap: 0.8rem; margin: 0 clamp(1.25rem, 4vw, 3.5rem) 1rem; padding: 0.85rem; border: 1px solid #ddd3ff; border-radius: 8px; background: #faf9ff; }.ai-panel-actions, .ai-result > div:last-child { display: flex; flex-wrap: wrap; gap: 0.4rem; }.ai-panel button { padding: 0.42rem 0.65rem; border-radius: 6px; color: #fff; background: #8b5cf6; font-size: 0.7rem; }.ai-panel button:hover { background: #7650dc; }.ai-panel button.quiet { color: #666a73; background: #fff; }.ai-result { display: grid; gap: 0.65rem; padding-top: 0.75rem; border-top: 1px solid #e7e1fa; color: #555860; font-size: 0.78rem; line-height: 1.6; }.ai-result h2, .ai-result p { margin: 0; }.ai-result h2 { color: #45474e; font-size: 0.78rem; }.ai-result label { display: flex; align-items: baseline; gap: 0.45rem; }.ai-result label input { width: auto; }.ai-result small { color: #92959c; }.password-change-dialog { display: grid; gap: 0.8rem; }.password-change-dialog p { margin: 0; }.password-change-dialog label { color: #666a73; font-size: 0.72rem; }.password-change-dialog button { justify-self: end; padding: 0.55rem 0.8rem; border-radius: 6px; color: #fff; background: #8b5cf6; font-size: 0.72rem; }
-.tag-input { display: flex; gap: 0.35rem; }.tag-input button { display: grid; width: 2.1rem; place-items: center; border: 1px solid #ddd3ff; border-radius: 6px; color: #7650dc; background: #faf9ff; }.ai-dialog { display: grid; gap: 0.8rem; width: min(100%, 36rem); }.ai-dialog > header { display: flex; align-items: center; justify-content: space-between; }.ai-dialog label { display: grid; gap: 0.35rem; color: #666a73; font-size: 0.72rem; }.ai-dialog :is(input, select) { width: 100%; box-sizing: border-box; border: 1px solid #e0e2e5; border-radius: 6px; background: #fff; color: #45474e; }.ai-dialog > button { width: fit-content; padding: 0.5rem 0.7rem; border-radius: 6px; color: #fff; background: #8b5cf6; font-size: 0.72rem; }.tag-suggestions { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }.tag-suggestions strong { flex-basis: 100%; color: #666a73; font-size: 0.72rem; }.tag-suggestions button { padding: 0.35rem 0.55rem; border: 1px solid #e0e2e5; border-radius: 999px; color: #666a73; background: #fff; font-size: 0.7rem; }.tag-suggestions button.selected { border-color: #c9baf8; color: #7650dc; background: #f2efff; }.dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }.dialog-actions button { padding: 0.45rem 0.65rem; border-radius: 6px; color: #fff; background: #8b5cf6; font-size: 0.7rem; }.dialog-actions .quiet { color: #666a73; background: #fff; }.rewrite-source, .rewrite-diff { display: grid; gap: 0.45rem; padding: 0.75rem; border: 1px solid #e5e6e8; border-radius: 6px; background: #fafafa; color: #555860; font-size: 0.78rem; line-height: 1.55; }.rewrite-source p { margin: 0; white-space: pre-wrap; }.rewrite-diff del { padding: 0.35rem; color: #a33f38; background: #fff1f0; text-decoration: line-through; }.rewrite-diff ins { padding: 0.35rem; color: #236b50; background: #effaf4; text-decoration: none; }
+.note-organization { display: grid; grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr); gap: 0.75rem; margin: 0 1rem 1rem; }.note-organization label, .ai-panel > label { color: #666a73; font-size: 0.7rem; }.note-organization :is(select, input), .ai-panel input { width: 100%; box-sizing: border-box; border: 1px solid #e0e2e5; border-radius: 6px; background: #fff; color: #45474e; font-size: 0.76rem; }.ai-panel { display: grid; gap: 0.8rem; margin: 0 clamp(1.25rem, 4vw, 3.5rem) 1rem; padding: 0.85rem; border: 1px solid #ddd3ff; border-radius: 8px; background: #faf9ff; }.ai-panel-actions, .ai-result > div:last-child { display: flex; flex-wrap: wrap; gap: 0.4rem; }.ai-panel button { padding: 0.42rem 0.65rem; border-radius: 6px; color: #fff; background: #8b5cf6; font-size: 0.7rem; }.ai-panel button:hover { background: #7650dc; }.ai-panel button.quiet { color: #666a73; background: #fff; }.ai-result { display: grid; gap: 0.65rem; padding-top: 0.75rem; border-top: 1px solid #e7e1fa; color: #555860; font-size: 0.78rem; line-height: 1.6; }.ai-result h2, .ai-result p { margin: 0; }.ai-result h2 { color: #45474e; font-size: 0.78rem; }.ai-result label { display: flex; align-items: baseline; gap: 0.45rem; }.ai-result label input { width: auto; }.ai-result small { color: #92959c; }.password-change-dialog { display: grid; gap: 0.8rem; }.password-change-dialog p { margin: 0; }.password-change-dialog label { color: #666a73; font-size: 0.72rem; }.password-change-dialog button { justify-self: end; padding: 0.55rem 0.8rem; border-radius: 6px; color: #fff; background: #8b5cf6; font-size: 0.72rem; }
+.tag-pills { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.tag-pill { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.28rem 0.3rem 0.28rem 0.55rem; border: 1px solid #ddd3ff; border-radius: 999px; color: #7650dc; background: #faf9ff; font-size: 0.72rem; }
+.tag-pill-remove { display: grid; width: 1.1rem; height: 1.1rem; place-items: center; padding: 0; border-radius: 999px; color: #7650dc; background: transparent; }
+.tag-pill-remove:hover { color: #fff; background: #b39ce8; }
+.tag-pill-empty { color: #92959c; font-size: 0.72rem; }
+.tag-pill-add { display: grid; width: 1.6rem; height: 1.6rem; place-items: center; border: 1px solid #ddd3ff; border-radius: 999px; color: #7650dc; background: #faf9ff; }
+.tag-pill-add:hover { background: #f2efff; }
+:root[data-theme='dark'] .tag-pill { border-color: #45464d; color: #c4a9ff; background: #28292f; }
+:root[data-theme='dark'] .tag-pill-remove:hover { background: #4a3e73; }
+:root[data-theme='dark'] .tag-pill-empty { color: #9a9ea8; }
+:root[data-theme='dark'] .tag-pill-add { border-color: #45464d; color: #c4a9ff; }
+:root[data-theme='dark'] .tag-pill-add:hover { background: #343044; }.ai-dialog { display: grid; gap: 0.8rem; width: min(100%, 36rem); }.ai-dialog > header { display: flex; align-items: center; justify-content: space-between; }.ai-dialog label { display: grid; gap: 0.35rem; color: #666a73; font-size: 0.72rem; }.ai-dialog :is(input, select) { width: 100%; box-sizing: border-box; border: 1px solid #e0e2e5; border-radius: 6px; background: #fff; color: #45474e; }.ai-dialog > button { width: fit-content; padding: 0.5rem 0.7rem; border-radius: 6px; color: #fff; background: #8b5cf6; font-size: 0.72rem; }.tag-suggestions { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }.tag-suggestions strong { flex-basis: 100%; color: #666a73; font-size: 0.72rem; }.tag-suggestions button { padding: 0.35rem 0.55rem; border: 1px solid #e0e2e5; border-radius: 999px; color: #666a73; background: #fff; font-size: 0.7rem; }.tag-suggestions button.selected { border-color: #c9baf8; color: #7650dc; background: #f2efff; }.dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }.dialog-actions button { padding: 0.45rem 0.65rem; border-radius: 6px; color: #fff; background: #8b5cf6; font-size: 0.7rem; }.dialog-actions .quiet { color: #666a73; background: #fff; }.rewrite-source, .rewrite-diff { display: grid; gap: 0.45rem; padding: 0.75rem; border: 1px solid #e5e6e8; border-radius: 6px; background: #fafafa; color: #555860; font-size: 0.78rem; line-height: 1.55; }.rewrite-source p { margin: 0; white-space: pre-wrap; }.rewrite-diff del { padding: 0.35rem; color: #a33f38; background: #fff1f0; text-decoration: line-through; }.rewrite-diff ins { padding: 0.35rem; color: #236b50; background: #effaf4; text-decoration: none; }
 
 @media (max-width: 700px) {
   .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: 3.5rem minmax(0, 1fr); padding: 0.75rem; }
@@ -2952,7 +3148,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
   .dashboard-grid { grid-template-columns: 1fr; gap: 1.5rem; }
   .briefing-section { grid-column: auto; }
   .today-section { padding-left: 0; }
-  .editor, .tasks, .empty { margin: 1.5rem 0.4rem 2rem; }.tasks { padding-bottom: 1rem; }.tasks > :not(header) { margin-inline: 0.75rem; }.tasks > header { padding-inline: 0.75rem; }
+  .editor, .tasks, .empty { margin: 1.5rem 0.4rem 2rem; }.tasks { padding-bottom: 1rem; }.tasks > :not(header) { margin-inline: 0.75rem; }
   .settings-form, .platform-settings { grid-template-columns: 1fr; }.platform-settings > div { border-right: 0 !important; }.platform-settings > div:not(:last-child) { border-bottom: 1px solid #ececef; }.platform-settings > div:last-child { border-bottom: 0; }
   .managed-user { grid-template-columns: minmax(0, 1fr) 5.5rem; }.managed-user button { grid-column: 1 / -1; }
   .editor header input, .editor header strong { font-size: 1.75rem; }
@@ -2965,7 +3161,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 :root[data-theme='dark'] .ai-dialog :is(input, select), :root[data-theme='dark'] .ai-panel button.quiet, :root[data-theme='dark'] .ai-panel input, :root[data-theme='dark'] .assistant-composer, :root[data-theme='dark'] .assistant-history-item, :root[data-theme='dark'] .briefing-content, :root[data-theme='dark'] .briefing-preview, :root[data-theme='dark'] .confirm-dialog, :root[data-theme='dark'] .dialog-actions .quiet, :root[data-theme='dark'] .editor, :root[data-theme='dark'] .editor > header, :root[data-theme='dark'] .editor > input[type='file'], :root[data-theme='dark'] .empty-dashboard, :root[data-theme='dark'] .folder-create input, :root[data-theme='dark'] .global-search, :root[data-theme='dark'] .journal-entry-row, :root[data-theme='dark'] .login, :root[data-theme='dark'] .login label input:focus, :root[data-theme='dark'] .login:has(.oidc-primary) .password-submit, :root[data-theme='dark'] .managed-user select, :root[data-theme='dark'] .note-library-controls select, :root[data-theme='dark'] .note-organization :is(select, input), :root[data-theme='dark'] .quiet, :root[data-theme='dark'] .recent-item, :root[data-theme='dark'] .recent-list, :root[data-theme='dark'] .search-answer, :root[data-theme='dark'] .search-autocomplete, :root[data-theme='dark'] .search-autocomplete button, :root[data-theme='dark'] .search-replace-panel button, :root[data-theme='dark'] .search-replace-panel input, :root[data-theme='dark'] .search-result, :root[data-theme='dark'] .settings-form input, :root[data-theme='dark'] .settings-form select, :root[data-theme='dark'] .settings-form textarea, :root[data-theme='dark'] .settings-section, :root[data-theme='dark'] .summary-row, :root[data-theme='dark'] .tag-suggestions button, :root[data-theme='dark'] .task-create input, :root[data-theme='dark'] .task-create select, :root[data-theme='dark'] .task-filters, :root[data-theme='dark'] .tasks, :root[data-theme='dark'] .tasks > header, :root[data-theme='dark'] .tiptap-editor, :root[data-theme='dark'] .upload-control, :root[data-theme='dark'] .version button, :root[data-theme='dark'] .versions, :root[data-theme='dark'] .versions header button, :root[data-theme='dark'] .workspace > aside.app-sidebar { background: var(--d-surface); }
 :root[data-theme='dark'] .rewrite-source, :root[data-theme='dark'] .rewrite-diff, :root[data-theme='dark'] .editor-toolbar,
 :root[data-theme='dark'] .search-replace-panel, :root[data-theme='dark'] .ai-result small { background: var(--d-surface-alt); }
-:root[data-theme='dark'] .ai-panel, :root[data-theme='dark'] .assistant-history-item:hover, :root[data-theme='dark'] .carry-forward-panel, :root[data-theme='dark'] .journal-entry-row:hover, :root[data-theme='dark'] .login:has(.oidc-primary) .password-submit:hover, :root[data-theme='dark'] .quiet:hover, :root[data-theme='dark'] .recent-item:hover, :root[data-theme='dark'] .search-autocomplete button:hover, :root[data-theme='dark'] .search-result:hover, :root[data-theme='dark'] .search-replace-panel button:hover, :root[data-theme='dark'] .summary-row:hover, :root[data-theme='dark'] .tag-input button, :root[data-theme='dark'] .upload-control:hover, :root[data-theme='dark'] .version button:hover, :root[data-theme='dark'] .versions header button:hover, :root[data-theme='dark'] .assistant-history-item.active, :root[data-theme='dark'] .assistant-tool-call, :root[data-theme='dark'] .editor-toolbar button:focus-visible, :root[data-theme='dark'] .editor-toolbar button:hover, :root[data-theme='dark'] .folder-create button, :root[data-theme='dark'] .global-search-mode.active, :root[data-theme='dark'] .managed-user button, :root[data-theme='dark'] .note-link.active, :root[data-theme='dark'] .note-link:hover, :root[data-theme='dark'] .recent-icon, :root[data-theme='dark'] .search-results h3 span, :root[data-theme='dark'] .tag-suggestions button.selected, :root[data-theme='dark'] .task-drag-handle:hover, :root[data-theme='dark'] .task-filters button.active, :root[data-theme='dark'] .tiptap-editor :deep(.prose-editor code), :root[data-theme='dark'] .today-mark, :root[data-theme='dark'] .editor-toolbar button:hover, :root[data-theme='dark'] .quiet, :root[data-theme='dark'] .task-filters button.active { background: var(--d-tint); }
+:root[data-theme='dark'] .ai-panel, :root[data-theme='dark'] .assistant-history-item:hover, :root[data-theme='dark'] .carry-forward-panel, :root[data-theme='dark'] .journal-entry-row:hover, :root[data-theme='dark'] .login:has(.oidc-primary) .password-submit:hover, :root[data-theme='dark'] .quiet:hover, :root[data-theme='dark'] .recent-item:hover, :root[data-theme='dark'] .search-autocomplete button:hover, :root[data-theme='dark'] .search-result:hover, :root[data-theme='dark'] .search-replace-panel button:hover, :root[data-theme='dark'] .summary-row:hover, :root[data-theme='dark'] .tag-pill-add, :root[data-theme='dark'] .upload-control:hover, :root[data-theme='dark'] .version button:hover, :root[data-theme='dark'] .versions header button:hover, :root[data-theme='dark'] .assistant-history-item.active, :root[data-theme='dark'] .assistant-tool-call, :root[data-theme='dark'] .editor-toolbar button:focus-visible, :root[data-theme='dark'] .editor-toolbar button:hover, :root[data-theme='dark'] .folder-create button, :root[data-theme='dark'] .global-search-mode.active, :root[data-theme='dark'] .managed-user button, :root[data-theme='dark'] .note-link.active, :root[data-theme='dark'] .note-link:hover, :root[data-theme='dark'] .recent-icon, :root[data-theme='dark'] .search-results h3 span, :root[data-theme='dark'] .tag-suggestions button.selected, :root[data-theme='dark'] .task-drag-handle:hover, :root[data-theme='dark'] .task-filters button.active, :root[data-theme='dark'] .tiptap-editor :deep(.prose-editor code), :root[data-theme='dark'] .today-mark, :root[data-theme='dark'] .editor-toolbar button:hover, :root[data-theme='dark'] .quiet, :root[data-theme='dark'] .task-filters button.active { background: var(--d-tint); }
 :root[data-theme='dark'] .assistant-composer, :root[data-theme='dark'] .briefing-content, :root[data-theme='dark'] .briefing-preview, :root[data-theme='dark'] .confirm-dialog, :root[data-theme='dark'] .search-answer, :root[data-theme='dark'] .search-autocomplete, :root[data-theme='dark'] .settings-section, :root[data-theme='dark'] .versions, :root[data-theme='dark'] .workspace > aside.app-sidebar, :root[data-theme='dark'] .workspace-topbar, :root[data-theme='dark'] .assistant-history-item, :root[data-theme='dark'] .editor, :root[data-theme='dark'] .editor > header, :root[data-theme='dark'] .editor-toolbar, :root[data-theme='dark'] .journal-entry-row, :root[data-theme='dark'] .journal-entry-row:last-of-type, :root[data-theme='dark'] .recent-list, :root[data-theme='dark'] .rewrite-diff, :root[data-theme='dark'] .rewrite-source, :root[data-theme='dark'] .search-replace-panel, :root[data-theme='dark'] .search-result, :root[data-theme='dark'] .search-result:last-of-type, :root[data-theme='dark'] .summary-row, :root[data-theme='dark'] .summary-row:last-of-type, :root[data-theme='dark'] .task-filters, :root[data-theme='dark'] .tasks, :root[data-theme='dark'] .tasks > header, :root[data-theme='dark'] .today-card, :root[data-theme='dark'] .sidebar-footer, :root[data-theme='dark'] .sidebar-heading, :root[data-theme='dark'] .sidebar-section-label, :root[data-theme='dark'] .recent-item, :root[data-theme='dark'] .search-autocomplete button + button, :root[data-theme='dark'] .login, :root[data-theme='dark'] .managed-user select, :root[data-theme='dark'] .quiet, :root[data-theme='dark'] .upload-control, :root[data-theme='dark'] .version button, :root[data-theme='dark'] .versions header button, :root[data-theme='dark'] .ai-dialog :is(input, select), :root[data-theme='dark'] .ai-panel input, :root[data-theme='dark'] .folder-create input, :root[data-theme='dark'] .global-search, :root[data-theme='dark'] .login label input, :root[data-theme='dark'] .note-library-controls select, :root[data-theme='dark'] .note-organization :is(select, input), :root[data-theme='dark'] .search-replace-panel button, :root[data-theme='dark'] .search-replace-panel input, :root[data-theme='dark'] .settings-form input, :root[data-theme='dark'] .settings-form select, :root[data-theme='dark'] .settings-form textarea, :root[data-theme='dark'] .tag-suggestions button, :root[data-theme='dark'] .task-create input, :root[data-theme='dark'] .task-create select { border-color: var(--d-border); }
 :root[data-theme='dark'] .assistant-history-item:hover, :root[data-theme='dark'] .journal-entry-row:hover, :root[data-theme='dark'] .search-result:hover,
 :root[data-theme='dark'] .summary-row:hover, :root[data-theme='dark'] .assistant-history-item.active, :root[data-theme='dark'] .login:has(.oidc-primary) .password-submit:hover,
@@ -2986,6 +3182,9 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 :root[data-theme='dark'] .library-header-copy p, :root[data-theme='dark'] .library-empty { color: #9a9ea8; }
 :root[data-theme='dark'] .library-empty { border-color: #363a43; }
 :root[data-theme='dark'] .library-view-toggle { background: #202329; border-color: #333740; }
+:root[data-theme='dark'] .settings-nav button { color: #9a9ea8; }
+:root[data-theme='dark'] .settings-nav button:hover { color: #eceef2; background: #2b2540; }
+:root[data-theme='dark'] .settings-nav button.active { color: #c4a9ff; background: #343044; }
 :root[data-theme='dark'] .library-view-toggle button.active { color: #c4b5fd; background: #2b2540; }
 :root[data-theme='dark'] .library-filter select { background: #202329; border-color: #333740; color: #d5d8de; }
 :root[data-theme='dark'] .assistant-choices { border-top-color: #333740; }
