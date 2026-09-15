@@ -24,8 +24,10 @@ export function localDate(timezone: string) {
   return `${value('year')}-${value('month')}-${value('day')}`;
 }
 
-export function journalBody(_date: string, _timezone: string) {
-  return `## Carry forward\n\n- \n\n## Today's focus\n\n- \n\n## Notes\n\n\n## Tasks\n\n- [ ] \n\n## Wins / notes to future me\n\n`;
+const defaultJournalTemplate = `## Carry forward\n\n- \n\n## Today's focus\n\n- \n\n## Notes\n\n\n## Tasks\n\n- [ ] \n\n## Wins / notes to future me\n\n`;
+
+export function journalBody(customTemplate?: string | null) {
+  return customTemplate?.trim() ? customTemplate : defaultJournalTemplate;
 }
 
 function markdownTasks(bodyMarkdown: string) {
@@ -96,7 +98,7 @@ export function registerJournalRoutes(app: FastifyInstance, prisma: PrismaClient
     const journalDate = new Date(`${date}T00:00:00Z`);
     const journal = await prisma.journal.upsert({
       where: { userId_journalDate: { userId: user.id, journalDate } },
-      create: { userId: user.id, journalDate, bodyMarkdown: request.body.bodyMarkdown ?? journalBody(date, user.timezone) },
+      create: { userId: user.id, journalDate, bodyMarkdown: request.body.bodyMarkdown ?? journalBody(user.journalTemplate) },
       update: { bodyMarkdown: request.body.bodyMarkdown ?? undefined },
     });
     return reply.code(201).send({ journal });
@@ -139,7 +141,7 @@ export function registerJournalRoutes(app: FastifyInstance, prisma: PrismaClient
     }
 
     const journal = await prisma.journal.create({
-      data: { userId: user.id, journalDate: new Date(`${date}T00:00:00Z`), bodyMarkdown: journalBody(date, user.timezone) },
+      data: { userId: user.id, journalDate: new Date(`${date}T00:00:00Z`), bodyMarkdown: journalBody(user.journalTemplate) },
     });
 
     jobQueue.add('carry_forward', { journalId: journal.id, userId: user.id }).catch(() => {
@@ -155,7 +157,7 @@ export function registerJournalRoutes(app: FastifyInstance, prisma: PrismaClient
     const date = localDate(user.timezone);
     const journal = await prisma.journal.upsert({
       where: { userId_journalDate: { userId: user.id, journalDate: new Date(`${date}T00:00:00Z`) } },
-      create: { userId: user.id, journalDate: new Date(`${date}T00:00:00Z`), bodyMarkdown: journalBody(date, user.timezone) },
+      create: { userId: user.id, journalDate: new Date(`${date}T00:00:00Z`), bodyMarkdown: journalBody(user.journalTemplate) },
       update: {},
     });
     if (request.body.baseVersion !== undefined && request.body.baseVersion !== journal.version) {

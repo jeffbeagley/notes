@@ -410,11 +410,26 @@
       </article>
       <article v-else-if="view === 'settings'" class="tasks settings-view">
         <header><h2>Settings</h2></header>
-        <section class="settings-section"><div class="settings-section-heading"><h3>User settings</h3><p>Preferences for your account and daily journal.</p></div><form class="settings-form" @submit.prevent="saveUserSettings"><label>Username <input :value="userSettings.username" readonly /></label><label>Display name <input v-model="userSettings.displayName" aria-label="Display name" placeholder="How your name appears" maxlength="80" /></label><label>Account role <input :value="userSettings.role" readonly /></label><label>Email <input v-model="userSettings.email" type="email" aria-label="Email" placeholder="you@example.com" /></label><label>Timezone <input v-model="userSettings.timezone" aria-label="Timezone" placeholder="America/Chicago" required /></label><label class="assistant-prompt-field">Assistant instructions <textarea v-model="userSettings.assistantPrompt" aria-label="Assistant instructions" maxlength="4000" /></label><label class="assistant-prompt-field">Daily briefing instructions <textarea v-model="userSettings.briefingPrompt" aria-label="Daily briefing instructions" maxlength="4000" /></label><p v-if="settingsError" class="settings-error">{{ settingsError }}</p><p v-if="settingsNotice" class="settings-notice" role="status">{{ settingsNotice }}</p><button :disabled="savingSettings">{{ savingSettings ? 'Saving...' : 'Save settings' }}</button></form></section>
-        <section class="settings-section"><div class="settings-section-heading"><h3>Change password</h3><p>Use at least twelve characters and keep this password private.</p></div><form class="settings-form password-settings-form" @submit.prevent="changePassword"><label>Current password <input v-model="passwordChange.currentPassword" type="password" aria-label="Current password" autocomplete="current-password" required /></label><label>New password <input v-model="passwordChange.newPassword" type="password" aria-label="New password" autocomplete="new-password" minlength="12" required /></label><label>Confirm new password <input v-model="passwordChange.confirmPassword" type="password" aria-label="Confirm new password" autocomplete="new-password" minlength="12" required /></label><p v-if="passwordChangeError" class="settings-error">{{ passwordChangeError }}</p><p v-if="passwordChangeNotice" class="settings-notice" role="status">{{ passwordChangeNotice }}</p><button :disabled="changingPassword">{{ changingPassword ? 'Updating...' : 'Update password' }}</button></form></section>
-        <section v-if="user?.role === 'admin'" class="settings-section"><div class="settings-section-heading"><h3>Platform settings</h3><p>Managed by deployment configuration and shown without secrets.</p></div><div v-if="platformSettings" class="platform-settings"><div><span>Runtime</span><strong>{{ platformSettings.runtime }}</strong></div><div><span>Password sign-in</span><strong>{{ platformSettings.authentication.passwordEnabled ? 'Enabled' : 'Disabled' }}</strong></div><div><span>Single sign-on</span><strong>{{ platformSettings.authentication.oidcConfigured ? 'Configured' : 'Not configured' }}</strong></div><div><span>Session signing</span><strong>{{ platformSettings.authentication.sessionSecretConfigured ? 'Configured' : 'Development default' }}</strong></div><div><span>AI search</span><strong>{{ platformSettings.integrations.aiEnabled ? 'Enabled' : 'Disabled' }}</strong></div><div><span>AI credential</span><strong>{{ platformSettings.integrations.aiCredentialConfigured ? 'Configured' : 'Not configured' }}</strong></div><div><span>Queue service</span><strong>{{ platformSettings.integrations.queueConfigured ? 'Configured' : 'Not configured' }}</strong></div><div><span>Media storage</span><strong>{{ platformSettings.storage.mediaStorageConfigured ? 'Configured' : 'Not configured' }}</strong></div></div></section>
-        <section v-if="user?.role === 'admin'" class="settings-section"><div class="settings-section-heading"><h3>Create local user</h3><p>Create a password-based account. Adding an email allows verified SSO to link to this account.</p></div><form class="settings-form" @submit.prevent="createLocalUser"><label>Username <input v-model="newLocalUser.username" aria-label="New username" autocomplete="off" required /></label><label>Email <input v-model="newLocalUser.email" type="email" aria-label="New user email" placeholder="user@example.com" /></label><label>Password <input v-model="newLocalUser.password" type="password" aria-label="New user password" autocomplete="new-password" minlength="12" required /></label><label>Role <select v-model="newLocalUser.role" aria-label="New user role"><option value="user">User</option><option value="admin">Admin</option></select></label><p v-if="userManagementError" class="settings-error">{{ userManagementError }}</p><button :disabled="creatingUser">{{ creatingUser ? 'Creating...' : 'Create user' }}</button></form></section>
-        <section v-if="user?.role === 'admin'" class="settings-section"><div class="settings-section-heading"><h3>Users</h3><p>Manage account roles. Changes take effect on the user’s next request.</p></div><p v-if="userManagementError" class="settings-error">{{ userManagementError }}</p><div class="user-management"><div v-for="managedUser in managedUsers" :key="managedUser.id" class="managed-user"><span><strong>{{ managedUser.username }}</strong><small>{{ managedUser.email || 'No email address' }} · {{ managedUser.timezone }}</small></span><select v-model="managedUser.role" :aria-label="`${managedUser.username} role`"><option value="user">User</option><option value="admin">Admin</option></select><button :disabled="managingUserId === managedUser.id" @click="saveUserRole(managedUser)">{{ managingUserId === managedUser.id ? 'Saving...' : 'Save role' }}</button></div></div></section>
+        <div class="settings-layout">
+          <nav class="settings-nav" aria-label="Settings sections">
+            <button type="button" :class="{ active: settingsTab === 'account' }" @click="settingsTab = 'account'">Account</button>
+            <button type="button" :class="{ active: settingsTab === 'ai' }" @click="settingsTab = 'ai'">AI</button>
+            <button type="button" :class="{ active: settingsTab === 'journal' }" @click="settingsTab = 'journal'">Journal</button>
+            <button type="button" :class="{ active: settingsTab === 'security' }" @click="settingsTab = 'security'">Security</button>
+            <button v-if="user?.role === 'admin'" type="button" :class="{ active: settingsTab === 'admin' }" @click="settingsTab = 'admin'">Admin</button>
+          </nav>
+          <div class="settings-panels">
+            <section v-if="settingsTab === 'account'" class="settings-section"><div class="settings-section-heading"><h3>Account</h3><p>Preferences for your account and profile.</p></div><form class="settings-form" @submit.prevent="saveUserSettings"><label>Username <input :value="userSettings.username" readonly /></label><label>Display name <input v-model="userSettings.displayName" aria-label="Display name" placeholder="How your name appears" maxlength="80" /></label><label>Account role <input :value="userSettings.role" readonly /></label><label>Email <input v-model="userSettings.email" type="email" aria-label="Email" placeholder="you@example.com" /></label><label>Timezone <input v-model="userSettings.timezone" aria-label="Timezone" placeholder="America/Chicago" required /></label><p v-if="settingsError" class="settings-error">{{ settingsError }}</p><p v-if="settingsNotice" class="settings-notice" role="status">{{ settingsNotice }}</p><button :disabled="savingSettings">{{ savingSettings ? 'Saving...' : 'Save settings' }}</button></form></section>
+            <section v-if="settingsTab === 'ai'" class="settings-section"><div class="settings-section-heading"><h3>AI</h3><p>Instructions used by the assistant and daily briefing.</p></div><form class="settings-form" @submit.prevent="saveUserSettings"><label class="assistant-prompt-field">Assistant instructions <textarea v-model="userSettings.assistantPrompt" aria-label="Assistant instructions" maxlength="4000" /></label><label class="assistant-prompt-field">Daily briefing instructions <textarea v-model="userSettings.briefingPrompt" aria-label="Daily briefing instructions" maxlength="4000" /></label><p v-if="settingsError" class="settings-error">{{ settingsError }}</p><p v-if="settingsNotice" class="settings-notice" role="status">{{ settingsNotice }}</p><button :disabled="savingSettings">{{ savingSettings ? 'Saving...' : 'Save settings' }}</button></form></section>
+            <section v-if="settingsTab === 'journal'" class="settings-section"><div class="settings-section-heading"><h3>Journal template</h3><p>Customize the starting content for new journal entries. This only applies to entries created from now on; existing entries are not changed.</p></div><form class="settings-form journal-template-form" @submit.prevent="saveJournalTemplate"><label class="assistant-prompt-field">Template <textarea v-model="journalTemplateDraft" aria-label="Journal template" :placeholder="defaultJournalTemplate" maxlength="8000" rows="14" /></label><p v-if="journalTemplateError" class="settings-error">{{ journalTemplateError }}</p><p v-if="journalTemplateNotice" class="settings-notice" role="status">{{ journalTemplateNotice }}</p><div class="dialog-actions"><button type="button" class="quiet" @click="resetJournalTemplate">Reset to default</button><button type="button" class="quiet" @click="toggleJournalTemplateVersions">{{ journalTemplateVersionsOpen ? 'Hide history' : 'History' }}</button><button :disabled="savingJournalTemplate">{{ savingJournalTemplate ? 'Saving...' : 'Save template' }}</button></div></form><aside v-if="journalTemplateVersionsOpen" class="versions inline-versions"><header><h2>Template history</h2><button title="Close template history" @click="journalTemplateVersionsOpen = false">Close</button></header><p v-if="!journalTemplateVersions.length">No saved versions yet.</p><div v-for="item in journalTemplateVersions" :key="item.id" class="version"><span>v{{ item.versionN }} · {{ item.source }} · {{ new Date(item.createdAt).toLocaleString() }}</span><button @click="restoreJournalTemplateVersion(item.id)">Restore</button></div></aside></section>
+            <section v-if="settingsTab === 'security'" class="settings-section"><div class="settings-section-heading"><h3>Change password</h3><p>Use at least twelve characters and keep this password private.</p></div><form class="settings-form password-settings-form" @submit.prevent="changePassword"><label>Current password <input v-model="passwordChange.currentPassword" type="password" aria-label="Current password" autocomplete="current-password" required /></label><label>New password <input v-model="passwordChange.newPassword" type="password" aria-label="New password" autocomplete="new-password" minlength="12" required /></label><label>Confirm new password <input v-model="passwordChange.confirmPassword" type="password" aria-label="Confirm new password" autocomplete="new-password" minlength="12" required /></label><p v-if="passwordChangeError" class="settings-error">{{ passwordChangeError }}</p><p v-if="passwordChangeNotice" class="settings-notice" role="status">{{ passwordChangeNotice }}</p><button :disabled="changingPassword">{{ changingPassword ? 'Updating...' : 'Update password' }}</button></form></section>
+            <template v-if="settingsTab === 'admin' && user?.role === 'admin'">
+              <section class="settings-section"><div class="settings-section-heading"><h3>Platform settings</h3><p>Managed by deployment configuration and shown without secrets.</p></div><div v-if="platformSettings" class="platform-settings"><div><span>Runtime</span><strong>{{ platformSettings.runtime }}</strong></div><div><span>Password sign-in</span><strong>{{ platformSettings.authentication.passwordEnabled ? 'Enabled' : 'Disabled' }}</strong></div><div><span>Single sign-on</span><strong>{{ platformSettings.authentication.oidcConfigured ? 'Configured' : 'Not configured' }}</strong></div><div><span>Session signing</span><strong>{{ platformSettings.authentication.sessionSecretConfigured ? 'Configured' : 'Development default' }}</strong></div><div><span>AI search</span><strong>{{ platformSettings.integrations.aiEnabled ? 'Enabled' : 'Disabled' }}</strong></div><div><span>AI credential</span><strong>{{ platformSettings.integrations.aiCredentialConfigured ? 'Configured' : 'Not configured' }}</strong></div><div><span>Queue service</span><strong>{{ platformSettings.integrations.queueConfigured ? 'Configured' : 'Not configured' }}</strong></div><div><span>Media storage</span><strong>{{ platformSettings.storage.mediaStorageConfigured ? 'Configured' : 'Not configured' }}</strong></div></div></section>
+              <section class="settings-section"><div class="settings-section-heading"><h3>Create local user</h3><p>Create a password-based account. Adding an email allows verified SSO to link to this account.</p></div><form class="settings-form" @submit.prevent="createLocalUser"><label>Username <input v-model="newLocalUser.username" aria-label="New username" autocomplete="off" required /></label><label>Email <input v-model="newLocalUser.email" type="email" aria-label="New user email" placeholder="user@example.com" /></label><label>Password <input v-model="newLocalUser.password" type="password" aria-label="New user password" autocomplete="new-password" minlength="12" required /></label><label>Role <select v-model="newLocalUser.role" aria-label="New user role"><option value="user">User</option><option value="admin">Admin</option></select></label><p v-if="userManagementError" class="settings-error">{{ userManagementError }}</p><button :disabled="creatingUser">{{ creatingUser ? 'Creating...' : 'Create user' }}</button></form></section>
+              <section class="settings-section"><div class="settings-section-heading"><h3>Users</h3><p>Manage account roles. Changes take effect on the user’s next request.</p></div><p v-if="userManagementError" class="settings-error">{{ userManagementError }}</p><div class="user-management"><div v-for="managedUser in managedUsers" :key="managedUser.id" class="managed-user"><span><strong>{{ managedUser.username }}</strong><small>{{ managedUser.email || 'No email address' }} · {{ managedUser.timezone }}</small></span><select v-model="managedUser.role" :aria-label="`${managedUser.username} role`"><option value="user">User</option><option value="admin">Admin</option></select><button :disabled="managingUserId === managedUser.id" @click="saveUserRole(managedUser)">{{ managingUserId === managedUser.id ? 'Saving...' : 'Save role' }}</button></div></div></section>
+            </template>
+          </div>
+        </div>
       </article>
       <article v-else-if="view === 'notes'" class="empty"><h2>No note selected</h2><button @click="createNote(null)">Create note</button></article>
       <div v-if="user.forcePasswordChange" class="confirm-backdrop">
@@ -482,7 +497,7 @@ import MarkdownIt from 'markdown-it';
 import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ArrowUpRight, BarChart3, Bold, Book, BookOpen, Calendar, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, Code2, FileText, GripVertical, Heading2, Highlighter, HelpCircle, Home, ImagePlus, Italic, LayoutGrid, Library, Link2, List, ListChecks, Menu, MessageSquare, Moon, PanelLeft, Plus, Quote, Redo2, Replace, Rows3, Search, Settings, Sparkles, Star, Strikethrough, Subscript as SubscriptIcon, Superscript as SuperscriptIcon, Sun, Trash2, Underline as UnderlineIcon, Undo2, X } from '@lucide/vue';
 
 type User = { id: string; username: string; displayName: string | null; role: string; timezone: string; forcePasswordChange: boolean };
-type UserSettings = { username: string; displayName: string | null; email: string | null; role: string; timezone: string; assistantPrompt: string; briefingPrompt: string };
+type UserSettings = { username: string; displayName: string | null; email: string | null; role: string; timezone: string; assistantPrompt: string; briefingPrompt: string; journalTemplate: string | null; journalTemplateVersion: number };
 type PlatformSettings = { runtime: string; authentication: { passwordEnabled: boolean; oidcConfigured: boolean; sessionSecretConfigured: boolean }; integrations: { aiEnabled: boolean; aiCredentialConfigured: boolean; queueConfigured: boolean }; storage: { mediaStorageConfigured: boolean } };
 type ManagedUser = { id: string; username: string; email: string | null; role: 'admin' | 'user'; enabled: boolean; timezone: string; createdAt: string };
 type Note = { id: string; title: string; bodyMarkdown: string; version: number; updatedAt: string; period?: string; notebookId?: string | null; tags?: string[]; archived?: boolean };
@@ -494,6 +509,7 @@ type LibraryCard = { type: LibraryItemType; id: string; title: string; icon: str
 type LibraryTreeNote = { id: string; notebookId: string | null; title: string; updatedAt: string };
 type ExtractedTask = { title: string; dueDate?: string; selected: boolean };
 type DocumentVersion = { id: string; versionN: number; title: string | null; source: string; createdAt: string };
+type JournalTemplateVersion = { id: string; versionN: number; bodyMarkdown: string; source: string; createdAt: string };
 type Journal = { id: string; journalDate: string; bodyMarkdown: string; version: number; updatedAt: string; suggestedCarryForward?: { suggestions?: string[] } };
 type Task = { id: string; title: string; status: 'todo' | 'doing' | 'done' | 'cancelled' };
 type SearchHit = AssistantSearchHit;
@@ -689,12 +705,37 @@ Do not explain your process, list assumptions, or add a preamble. Output only th
 - Omit this section if empty.
 
 If a section has no items, omit the section rather than writing "none," except when the entire briefing has nothing to report.`;
-const userSettings = ref<UserSettings>({ username: '', displayName: null, email: null, role: '', timezone: '', assistantPrompt: defaultAssistantPrompt, briefingPrompt: defaultBriefingPrompt });
+const userSettings = ref<UserSettings>({ username: '', displayName: null, email: null, role: '', timezone: '', assistantPrompt: defaultAssistantPrompt, briefingPrompt: defaultBriefingPrompt, journalTemplate: null, journalTemplateVersion: 1 });
 const platformSettings = ref<PlatformSettings | null>(null);
 const aiSearchEnabled = computed(() => platformSettings.value?.integrations.aiEnabled !== false);
 const savingSettings = ref(false);
 const settingsError = ref('');
 const settingsNotice = ref('');
+const settingsTab = ref<'account' | 'ai' | 'journal' | 'security' | 'admin'>('account');
+const defaultJournalTemplate = `## Carry forward
+
+- 
+
+## Today's focus
+
+- 
+
+## Notes
+
+
+## Tasks
+
+- [ ] 
+
+## Wins / notes to future me
+
+`;
+const journalTemplateDraft = ref('');
+const savingJournalTemplate = ref(false);
+const journalTemplateError = ref('');
+const journalTemplateNotice = ref('');
+const journalTemplateVersions = ref<JournalTemplateVersion[]>([]);
+const journalTemplateVersionsOpen = ref(false);
 const managedUsers = ref<ManagedUser[]>([]);
 const managingUserId = ref<string | null>(null);
 const userManagementError = ref('');
@@ -892,7 +933,7 @@ function resetWorkspaceState() {
   journalAssistantConversationId.value = null;
   autocompleteHits.value = [];
   autocompleteOpen.value = false;
-  userSettings.value = { username: '', displayName: null, email: null, role: '', timezone: '', assistantPrompt: defaultAssistantPrompt, briefingPrompt: defaultBriefingPrompt };
+  userSettings.value = { username: '', displayName: null, email: null, role: '', timezone: '', assistantPrompt: defaultAssistantPrompt, briefingPrompt: defaultBriefingPrompt, journalTemplate: null, journalTemplateVersion: 1 };
   platformSettings.value = null;
   managedUsers.value = [];
   tasks.value = [];
@@ -2103,6 +2144,10 @@ async function openSettings(updateRoute = true) {
   if (response.ok) {
     const settings = (await response.json() as { settings: Omit<UserSettings, 'assistantPrompt' | 'briefingPrompt'> & { assistantPrompt: string | null; briefingPrompt: string | null } }).settings;
     userSettings.value = { ...settings, assistantPrompt: settings.assistantPrompt || defaultAssistantPrompt, briefingPrompt: settings.briefingPrompt || defaultBriefingPrompt };
+    journalTemplateDraft.value = settings.journalTemplate ?? '';
+    journalTemplateError.value = '';
+    journalTemplateNotice.value = '';
+    journalTemplateVersionsOpen.value = false;
   }
   if (user.value?.role === 'admin') {
     const platformResponse = await fetch('/api/v1/settings/platform', { credentials: 'include' });
@@ -2128,6 +2173,55 @@ async function saveUserSettings() {
     settingsError.value = error instanceof Error ? error.message : 'Unable to save settings';
   } finally {
     savingSettings.value = false;
+  }
+}
+
+async function saveJournalTemplate() {
+  savingJournalTemplate.value = true;
+  journalTemplateError.value = '';
+  journalTemplateNotice.value = '';
+  try {
+    const response = await fetch('/api/v1/settings/journal-template', { method: 'PATCH', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ journalTemplate: journalTemplateDraft.value }) });
+    const body = await response.json() as { journalTemplate?: string | null; journalTemplateVersion?: number; error?: string };
+    if (!response.ok) throw new Error(body.error ?? 'Unable to save journal template');
+    journalTemplateDraft.value = body.journalTemplate ?? '';
+    userSettings.value = { ...userSettings.value, journalTemplate: body.journalTemplate ?? null, journalTemplateVersion: body.journalTemplateVersion ?? userSettings.value.journalTemplateVersion };
+    journalTemplateNotice.value = 'Journal template saved.';
+    if (journalTemplateVersionsOpen.value) await loadJournalTemplateVersions();
+  } catch (error) {
+    journalTemplateError.value = error instanceof Error ? error.message : 'Unable to save journal template';
+  } finally {
+    savingJournalTemplate.value = false;
+  }
+}
+
+function resetJournalTemplate() {
+  journalTemplateDraft.value = '';
+  void saveJournalTemplate();
+}
+
+async function loadJournalTemplateVersions() {
+  const response = await fetch('/api/v1/settings/journal-template/versions', { credentials: 'include' });
+  if (response.ok) journalTemplateVersions.value = (await response.json() as { versions: JournalTemplateVersion[] }).versions;
+}
+
+async function toggleJournalTemplateVersions() {
+  journalTemplateVersionsOpen.value = !journalTemplateVersionsOpen.value;
+  if (journalTemplateVersionsOpen.value) await loadJournalTemplateVersions();
+}
+
+async function restoreJournalTemplateVersion(versionId: string) {
+  journalTemplateError.value = '';
+  try {
+    const response = await fetch(`/api/v1/settings/journal-template/versions/${versionId}/restore`, { method: 'POST', credentials: 'include' });
+    const body = await response.json() as { journalTemplate?: string | null; journalTemplateVersion?: number; error?: string };
+    if (!response.ok) throw new Error(body.error ?? 'Unable to restore version');
+    journalTemplateDraft.value = body.journalTemplate ?? '';
+    userSettings.value = { ...userSettings.value, journalTemplate: body.journalTemplate ?? null, journalTemplateVersion: body.journalTemplateVersion ?? userSettings.value.journalTemplateVersion };
+    journalTemplateNotice.value = 'Journal template restored.';
+    await loadJournalTemplateVersions();
+  } catch (error) {
+    journalTemplateError.value = error instanceof Error ? error.message : 'Unable to restore version';
   }
 }
 
@@ -2635,6 +2729,7 @@ input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; color:
 .tiptap-editor .prose-editor ul[data-type='taskList'] li > div { min-width: 0; flex: 1; }
 .tiptap-editor .prose-editor ul[data-type='taskList'] li > div > p { margin: 0; }
 .versions { position: fixed; inset: 1.5rem 1.5rem 1.5rem auto; z-index: 4; width: min(25rem, calc(100vw - 3rem)); overflow-y: auto; padding: 1.25rem; border: 1px solid #e3e4e7; border-radius: 9px; background: #fff; box-shadow: 0 14px 36px #59616d1f; color: #45474e; }
+.versions.inline-versions { position: static; inset: auto; z-index: auto; width: 100%; margin-top: 1rem; box-shadow: none; }
 .versions header { display: flex; justify-content: space-between; align-items: center; }
 .versions h2 { margin: 0; color: #313238; font-size: 0.95rem; }
 .versions header button, .version button { padding: 0.4rem 0.55rem; border: 1px solid #e1e2e5; border-radius: 6px; color: #666a73; background: #fff; font-size: 0.7rem; }
@@ -2884,7 +2979,13 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .search-result:first-of-type { border-radius: 9px 9px 0 0; }.search-result:last-of-type { border-bottom: 1px solid #e5e6e8; border-radius: 0 0 9px 9px; }
 .search-result:only-of-type { border-radius: 9px; }.search-result:hover { border-color: #ddd3ff; background: #faf9ff; }.search-result strong { display: block; font-size: 0.78rem; }.search-result p { margin: 0.35rem 0 0 !important; color: #858991; font-size: 0.74rem; line-height: 1.55; }
 .assistant-view { display: flex; min-height: 34rem; flex-direction: column; }.assistant-layout { display: grid; grid-template-columns: 15rem minmax(0, 1fr); flex: 1; gap: 1.5rem; min-height: 0; }.assistant-history { display: grid; align-content: start; gap: 0.4rem; max-height: calc(100vh - 14rem); padding-right: 0.2rem; overflow-y: auto; }.assistant-history-item { display: flex; gap: 0.4rem; align-items: center; justify-content: space-between; padding: 0.55rem 0.65rem; border: 1px solid #e5e6e8; border-radius: 7px; background: #fff; cursor: pointer; }.assistant-history-item:hover { border-color: #ddd3ff; background: #faf9ff; }.assistant-history-item.active { border-color: #c9baf8; background: #f2efff; }.assistant-history-text { display: grid; min-width: 0; gap: 0.15rem; }.assistant-history-text strong { overflow: hidden; color: #313238; font-size: 0.78rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }.assistant-history-text small { color: #92959c; font-size: 0.68rem; }.assistant-history-delete { display: grid; flex: 0 0 auto; width: 1.5rem; height: 1.5rem; place-items: center; padding: 0; border-radius: 5px; color: #a0a2a8; background: transparent; }.assistant-history-delete:hover { color: #b64b42; background: #fbeceb; }.assistant-main { display: flex; min-width: 0; flex-direction: column; }.assistant-empty { display: grid; min-height: 20rem; place-content: center; justify-items: center; gap: 0.55rem; color: #a0a2a8; text-align: center; }.assistant-empty svg { color: #8255ec; }.assistant-empty p { margin: 0; font-size: 0.82rem; }.assistant-starters { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.45rem; margin-top: 0.4rem; max-width: 30rem; }.assistant-starter { display: flex; align-items: center; gap: 0.4rem; }.assistant-starter svg { flex: 0 0 auto; color: #8255ec; }.assistant-followups { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }.assistant-choices-hint { margin: 0; color: #9a9ea8; font-size: 0.68rem; font-style: italic; }.assistant-messages { display: grid; gap: 0.85rem; max-width: 48rem; margin-bottom: 1rem !important; }.assistant-message { width: fit-content; max-width: min(100%, 42rem); padding: 0.7rem 0.85rem; border-radius: 8px; color: #4b4d54; background: #f6f6f7; font-size: 0.82rem; line-height: 1.6; }.assistant-message.user { justify-self: end; color: #fff; background: #8b5cf6; }.assistant-message p { margin: 0; white-space: pre-wrap; }.assistant-markdown > :first-child { margin-top: 0; }.assistant-markdown > :last-child { margin-bottom: 0; }.assistant-markdown p { margin: 0.45rem 0; }.assistant-markdown pre { overflow-x: auto; padding: 0.65rem; border-radius: 6px; background: #262733; color: #f5f5f7; }.assistant-markdown code { font-family: ui-monospace, monospace; }.assistant-markdown li + li { margin-top: 0.2rem; }.assistant-message small { display: block; margin-top: 0.55rem; color: #92959c; font-size: 0.66rem; line-height: 1.45; }.assistant-message.user small { color: #eee9ff; }.assistant-thinking { color: #92959c; font-size: 0.74rem; }.assistant-markdown a[href^="assistant-source:"] { color: #7650dc; font-weight: 600; text-decoration: none; border-bottom: 1px dashed #c4a9ff; cursor: pointer; }.assistant-markdown a[href^="assistant-source:"]:hover { color: #5a2fc2; border-bottom-style: solid; }.assistant-tool-calls { display: grid; gap: 0.3rem; margin-bottom: 0.5rem; }.assistant-tool-call { display: inline-flex; width: fit-content; gap: 0.35rem; align-items: center; padding: 0.25rem 0.55rem; border-radius: 999px; color: #7650dc; background: #f2efff; font-size: 0.68rem; }.assistant-tool-call.running { color: #92959c; background: #eceef0; }.assistant-tool-call.failed { color: #b64b42; background: #fbeceb; }.assistant-tool-call.linkable { cursor: pointer; }.assistant-tool-call.linkable:hover { background: #e4dbff; }.assistant-tool-call .spin { animation: assistant-spin 0.9s linear infinite; }@keyframes assistant-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }.assistant-composer { display: flex; position: sticky; bottom: 1rem; gap: 0.5rem; align-items: center; margin-top: auto !important; padding: 0.55rem; border: 1px solid #e3e4e7; border-radius: 9px; background: #fff; box-shadow: 0 5px 18px #59616d0a; z-index: 3; }.assistant-composer input { min-width: 0; flex: 1; padding: 0.5rem 0.6rem; border: 0; background: transparent; color: #34363b; font-size: 0.8rem; }.assistant-composer button { display: grid; width: 2rem; height: 2rem; place-items: center; padding: 0; border-radius: 6px; color: #fff; background: #8b5cf6; }.assistant-composer button:hover { background: #7650dc; }.assistant-composer button:disabled { cursor: wait; opacity: 0.6; }
-.settings-section { margin-top: 1.25rem; padding: 1.1rem; border: 1px solid #e3e4e7; border-radius: 9px; background: #fff; box-shadow: 0 5px 18px #59616d0a; }.settings-section-heading h3 { margin: 0; color: #313238; font-size: 0.88rem; }.settings-section-heading p { margin: 0.3rem 0 1rem; color: #92959c; font-size: 0.74rem; }.settings-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }.settings-form label { color: #666a73; font-size: 0.72rem; }.settings-form input, .settings-form select, .settings-form textarea { width: 100%; border: 1px solid #e0e2e5; border-radius: 6px; background: #fff; color: #45474e; font-size: 0.78rem; }.settings-form textarea { min-height: 6rem; resize: vertical; line-height: 1.5; }.assistant-prompt-field { grid-column: 1 / -1; }.settings-form input[readonly] { color: #92959c; background: #fafafa; }.settings-form button { width: fit-content; padding: 0.55rem 0.8rem; border-radius: 6px; color: #fff; background: #8b5cf6; font-size: 0.72rem; font-weight: 650; }.settings-form button:hover { background: #7650dc; }.settings-form button:disabled { cursor: wait; opacity: 0.7; }.settings-error, .settings-notice { grid-column: 1 / -1; margin: 0; font-size: 0.72rem; }.settings-error { color: #b64b42; }.settings-notice { color: #31776b; }.platform-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid #ececef; border-radius: 7px; }.platform-settings > div { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.65rem 0.75rem; border-bottom: 1px solid #ececef; color: #777b83; font-size: 0.72rem; }.platform-settings > div:nth-last-child(-n + 2) { border-bottom: 0; }.platform-settings > div:nth-child(odd) { border-right: 1px solid #ececef; }.platform-settings span { color: #92959c; }.platform-settings strong { color: #45474e; font-weight: 650; text-align: right; }.user-management { overflow: hidden; border: 1px solid #ececef; border-radius: 7px; }.managed-user { display: grid; grid-template-columns: minmax(0, 1fr) 7rem 5.5rem; gap: 0.65rem; align-items: center; padding: 0.7rem 0.75rem; border-bottom: 1px solid #ececef; }.managed-user:last-child { border-bottom: 0; }.managed-user strong, .managed-user small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.managed-user strong { color: #45474e; font-size: 0.78rem; }.managed-user small { margin-top: 0.16rem; color: #92959c; font-size: 0.67rem; }.managed-user select { padding: 0.45rem 0.5rem; border: 1px solid #e1e2e5; border-radius: 6px; color: #666a73; background: #fff; font-size: 0.72rem; }.managed-user button { padding: 0.45rem 0.5rem; border-radius: 6px; color: #7650dc; background: #f2efff; font-size: 0.7rem; }.managed-user button:hover { background: #e9e2ff; }.managed-user button:disabled { cursor: wait; opacity: 0.7; }
+.settings-layout { display: grid; grid-template-columns: 11rem minmax(0, 1fr); gap: 1.5rem; align-items: start; margin: 0 clamp(1.25rem, 4vw, 3.5rem); }
+.settings-nav { display: grid; gap: 0.2rem; position: sticky; top: 1.25rem; }
+.settings-nav button { padding: 0.55rem 0.7rem; border: 0; border-radius: 6px; color: #666a73; background: transparent; font-size: 0.78rem; font-weight: 600; text-align: left; cursor: pointer; }
+.settings-nav button:hover { color: #45474e; background: #f5f4f8; }
+.settings-nav button.active { color: #7650dc; background: #f2efff; }
+.settings-panels { min-width: 0; }
+.settings-section { margin-top: 1.25rem; padding: 1.1rem; border: 1px solid #e3e4e7; border-radius: 9px; background: #fff; box-shadow: 0 5px 18px #59616d0a; }.settings-section-heading h3 { margin: 0; color: #313238; font-size: 0.88rem; }.settings-section-heading p { margin: 0.3rem 0 1rem; color: #92959c; font-size: 0.74rem; }.settings-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }.settings-form label { color: #666a73; font-size: 0.72rem; }.settings-form input, .settings-form select, .settings-form textarea { width: 100%; border: 1px solid #e0e2e5; border-radius: 6px; background: #fff; color: #45474e; font-size: 0.78rem; }.settings-form textarea { min-height: 6rem; resize: vertical; line-height: 1.5; }.assistant-prompt-field { grid-column: 1 / -1; }.settings-form input[readonly] { color: #92959c; background: #fafafa; }.settings-form button { width: fit-content; padding: 0.55rem 0.8rem; border-radius: 6px; color: #fff; background: #8b5cf6; font-size: 0.72rem; font-weight: 650; }.settings-form button:hover { background: #7650dc; }.settings-form button:disabled { cursor: wait; opacity: 0.7; }.settings-form > button:not(.quiet) { grid-column: 1 / -1; justify-self: end; }.journal-template-form .dialog-actions { grid-column: 1 / -1; }.journal-template-form .dialog-actions > button:not(.quiet) { width: fit-content; padding: 0.55rem 0.8rem; font-size: 0.72rem; font-weight: 650; }.settings-error, .settings-notice { grid-column: 1 / -1; margin: 0; font-size: 0.72rem; }.settings-error { color: #b64b42; }.settings-notice { color: #31776b; }.platform-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid #ececef; border-radius: 7px; }.platform-settings > div { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.65rem 0.75rem; border-bottom: 1px solid #ececef; color: #777b83; font-size: 0.72rem; }.platform-settings > div:nth-last-child(-n + 2) { border-bottom: 0; }.platform-settings > div:nth-child(odd) { border-right: 1px solid #ececef; }.platform-settings span { color: #92959c; }.platform-settings strong { color: #45474e; font-weight: 650; text-align: right; }.user-management { overflow: hidden; border: 1px solid #ececef; border-radius: 7px; }.managed-user { display: grid; grid-template-columns: minmax(0, 1fr) 7rem 5.5rem; gap: 0.65rem; align-items: center; padding: 0.7rem 0.75rem; border-bottom: 1px solid #ececef; }.managed-user:last-child { border-bottom: 0; }.managed-user strong, .managed-user small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.managed-user strong { color: #45474e; font-size: 0.78rem; }.managed-user small { margin-top: 0.16rem; color: #92959c; font-size: 0.67rem; }.managed-user select { padding: 0.45rem 0.5rem; border: 1px solid #e1e2e5; border-radius: 6px; color: #666a73; background: #fff; font-size: 0.72rem; }.managed-user button { padding: 0.45rem 0.5rem; border-radius: 6px; color: #7650dc; background: #f2efff; font-size: 0.7rem; }.managed-user button:hover { background: #e9e2ff; }.managed-user button:disabled { cursor: wait; opacity: 0.7; }
 .journal-entry-row { display: grid; grid-template-columns: 1.8rem minmax(0, 1fr) auto; gap: 0.65rem; align-items: center; width: 100%; padding: 0.85rem 0.9rem; border: 1px solid #e5e6e8; border-bottom: 0; color: #45474e; background: #fff; text-align: left; }.journal-entry-row:first-of-type { border-radius: 9px 9px 0 0; }.journal-entry-row:last-of-type { border-bottom: 1px solid #e5e6e8; border-radius: 0 0 9px 9px; }.journal-entry-row:only-of-type { border-radius: 9px; }.journal-entry-row:hover { border-color: #ddd3ff; background: #faf9ff; }.journal-entry-row > svg { color: #8255ec; }.journal-entry-row strong, .journal-entry-row small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.journal-entry-row strong { font-size: 0.8rem; }.journal-entry-row small { margin-top: 0.2rem; color: #92959c; font-size: 0.7rem; }.journal-entry-row > svg:last-child { color: #b3b5bb; }
 .journal-entry-list { margin-top: 1rem; }
 /* Shared year/period drill-down controls, used by the journal archive and period summaries pages. */
@@ -2998,6 +3099,9 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 :root[data-theme='dark'] .library-header-copy p, :root[data-theme='dark'] .library-empty { color: #9a9ea8; }
 :root[data-theme='dark'] .library-empty { border-color: #363a43; }
 :root[data-theme='dark'] .library-view-toggle { background: #202329; border-color: #333740; }
+:root[data-theme='dark'] .settings-nav button { color: #9a9ea8; }
+:root[data-theme='dark'] .settings-nav button:hover { color: #eceef2; background: #2b2540; }
+:root[data-theme='dark'] .settings-nav button.active { color: #c4a9ff; background: #343044; }
 :root[data-theme='dark'] .library-view-toggle button.active { color: #c4b5fd; background: #2b2540; }
 :root[data-theme='dark'] .library-filter select { background: #202329; border-color: #333740; color: #d5d8de; }
 :root[data-theme='dark'] .assistant-choices { border-top-color: #333740; }

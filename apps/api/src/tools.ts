@@ -497,7 +497,7 @@ async function createJournalTask(prisma: PrismaClient, userId: string, title: st
   const journalDate = new Date(`${dateKey}T00:00:00Z`);
   const { journal, task } = await prisma.$transaction(async (tx) => {
     const existing = await tx.journal.findUnique({ where: { userId_journalDate: { userId, journalDate } } });
-    const baseBody = existing?.bodyMarkdown ?? journalBody(dateKey, user.timezone);
+    const baseBody = existing?.bodyMarkdown ?? journalBody(user.journalTemplate);
     const bodyMarkdown = insertIntoTasksSection(baseBody, trimmedTitle);
     const savedJournal = existing
       ? await tx.journal.update({ where: { id: existing.id }, data: { bodyMarkdown, version: { increment: 1 } } })
@@ -525,7 +525,7 @@ async function addJournalEntry(prisma: PrismaClient, userId: string, entry: stri
   const journalDate = new Date(`${dateKey}T00:00:00Z`);
   const journal = await prisma.$transaction(async (tx) => {
     const existing = await tx.journal.findUnique({ where: { userId_journalDate: { userId, journalDate } } });
-    const baseBody = existing?.bodyMarkdown ?? journalBody(dateKey, user.timezone);
+    const baseBody = existing?.bodyMarkdown ?? journalBody(user.journalTemplate);
     const bodyMarkdown = insertIntoNotesSection(baseBody, trimmedEntry);
     const saved = existing
       ? await tx.journal.update({ where: { id: existing.id }, data: { bodyMarkdown, version: { increment: 1 } } })

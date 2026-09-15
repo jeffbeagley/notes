@@ -44,6 +44,7 @@ enum DocumentType {
   note
   journal
   summary
+  journal_template
 }
 
 enum LibraryItemType {
@@ -66,6 +67,8 @@ model User {
   displayName            String?
   assistantPrompt        String?
   briefingPrompt         String?
+  journalTemplate        String?
+  journalTemplateVersion Int                     @default(1)
   oidcSubject            String?                 @unique
   email                  String?                 @unique
   role                   UserRole                @default(user)
