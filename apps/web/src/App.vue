@@ -2998,7 +2998,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .period-node-dot { width: 7px; height: 7px; border-radius: 999px; background: #d9d9dc; flex-shrink: 0; }
 .period-node-dot.filled { background: #8b5cf6; }
 .period-node-label { flex: 1; }
-.carry-forward-panel { padding: 1rem; border: 1px solid #ddd3ff; border-radius: 9px; background: #faf9ff; margin-bottom: 1rem; margin: 1.25rem clamp(1.25rem, 4vw, 3.5rem) 1rem; }
+.carry-forward-panel { padding: 1rem; border: 1px solid #ddd3ff; border-radius: 9px; background: #faf9ff; margin: 1.25rem 1rem 1rem; }
 .carry-forward-panel h3 { margin: 0 0 0.5rem; color: #7650dc; font-size: 0.78rem; font-family: inherit; }
 .carry-forward-toggle { display: none; }
 .assistant-composer textarea { box-sizing: border-box; width: 100%; min-width: 0; min-height: 2.45rem; max-height: 12rem; flex: 1; padding: 0.5rem 0.6rem; border: 0; outline: 0; resize: vertical; background: transparent; color: #34363b; font-size: 0.8rem; line-height: 1.45; }
