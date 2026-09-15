@@ -93,7 +93,6 @@
         <div class="home-content">
           <div class="welcome-block"><p class="eyebrow">Personal knowledge workspace</p><h2>Good {{ greeting }}, {{ user.displayName || user.username }}.</h2><p>Find a thought, continue a note, or ask your workspace a question.</p></div>
           <div class="dashboard-grid">
-            <section class="dashboard-section briefing-section"><div class="section-heading"><h3>Daily briefing</h3><button @click="openBriefing">Open briefing <ArrowUpRight :size="13" :stroke-width="1.8" /></button></div><div v-if="briefing" class="briefing-preview"><div class="briefing-preview-heading"><span class="today-mark"><Sparkles :size="15" :stroke-width="1.8" /></span><strong>{{ briefing.title || 'Today\'s briefing' }}</strong></div><div class="briefing-preview-body" v-html="markdown.render(briefing.bodyMarkdown.slice(0, 280) + (briefing.bodyMarkdown.length > 280 ? '...' : ''))" /></div><div v-else class="briefing-preview briefing-empty"><Sparkles :size="16" :stroke-width="1.8" /><p>No briefing has been generated for today.</p><button @click="generateBriefing">Generate briefing</button></div></section>
             <section class="dashboard-section recent-section"><div class="section-heading"><h3>Recent notes</h3><button @click="createNote(null)">New note <Plus :size="13" :stroke-width="1.8" /></button></div><div v-if="notes.length" class="recent-list"><button v-for="note in notes.slice(0, 4)" :key="note.id" class="recent-item" @click="openNote(note.id)"><span class="recent-icon"><FileText :size="15" :stroke-width="1.8" /></span><span><strong>{{ note.title || 'Untitled note' }}</strong><small>Updated {{ new Date(note.updatedAt).toLocaleDateString() }}</small></span><ArrowUpRight class="item-arrow" :size="15" :stroke-width="1.8" /></button></div><div v-else class="empty-dashboard">Your notes will appear here.</div></section>
             <section class="dashboard-section today-section"><div class="section-heading"><h3>Today</h3><button @click="openJournal">Open journal <ArrowUpRight :size="13" :stroke-width="1.8" /></button></div><div class="today-card"><span class="today-mark"><BookOpen :size="15" :stroke-width="1.8" /></span><div><strong>Daily journal</strong><p>Capture what is on your mind today.</p></div></div><div class="today-card task-summary" @click="openTasks('today')"><span class="today-mark"><CheckSquare :size="15" :stroke-width="1.8" /></span><div><strong>Tasks for today</strong><p>Keep the important work moving.</p></div></div></section>
           </div>
@@ -365,9 +364,9 @@
         </div>
       </article>
       <article v-else-if="view === 'briefing'" class="editor">
-        <header><strong>Daily Briefing</strong><button class="quiet" :disabled="generatingBriefing" @click="generateBriefing">{{ generatingBriefing ? 'Generating...' : 'Regenerate Briefing' }}</button></header>
+        <header><strong>Daily Briefing <span class="briefing-date">{{ briefingDate }}</span></strong><div class="briefing-actions"><button class="quiet" title="Export to PDF" :disabled="exportingPdf" @click="requestExportPdf('briefing')">{{ exportingPdf ? 'Exporting...' : 'Export PDF' }}</button><button class="quiet" :disabled="generatingBriefing" @click="generateBriefing">{{ generatingBriefing ? 'Generating...' : 'Regenerate Briefing' }}</button></div></header>
         <div v-if="briefing" class="briefing-content">
-          <div v-html="markdown.render(briefing.bodyMarkdown)" />
+          <div v-html="markdown.render(briefingBodyMarkdown)" />
         </div>
         <div v-else class="empty">
           <p>No briefing note for today yet.</p>
@@ -668,8 +667,7 @@ Answer the user by synthesizing the relevant facts into a direct, practical resp
 - Do not explain your process unless asked.`;
 const defaultBriefingPrompt = `You are a personal daily briefing assistant.
 
-Your only job is to produce a short Markdown briefing titled for the current date:
-# Daily briefing — YYYY-MM-DD
+Your only job is to produce a short Markdown briefing for the current date. The date and title are shown separately in the application, so do not include a title or date heading in your output.
 
 Use ONLY the journals, notes, and open tasks provided in this conversation. Do not invent tasks, people, deadlines, or context. If a source is thin, incomplete, or silent, say so briefly instead of filling gaps.
 
@@ -708,6 +706,11 @@ Do not explain your process, list assumptions, or add a preamble. Output only th
 
 If a section has no items, omit the section rather than writing "none," except when the entire briefing has nothing to report.`;
 const userSettings = ref<UserSettings>({ username: '', displayName: null, email: null, role: '', timezone: '', assistantPrompt: defaultAssistantPrompt, briefingPrompt: defaultBriefingPrompt, journalTemplate: null, journalTemplateVersion: 1 });
+const briefingDate = computed(() => {
+  const dateKey = briefing.value?.title.match(/(\d{4}-\d{2}-\d{2})/)?.[1];
+  return formatJournalDate(dateKey ?? new Date().toISOString());
+});
+const briefingBodyMarkdown = computed(() => briefing.value?.bodyMarkdown.replace(/^#\s+Daily briefing\s+[—-]\s+\d{4}-\d{2}-\d{2}\s*\n+/i, '') ?? '');
 const platformSettings = ref<PlatformSettings | null>(null);
 const aiSearchEnabled = computed(() => platformSettings.value?.integrations.aiEnabled !== false);
 const savingSettings = ref(false);
@@ -756,7 +759,7 @@ const versionsOpen = ref(false);
 const deleteConfirmOpen = ref(false);
 const exportingPdf = ref(false);
 const exportHiddenConfirmOpen = ref(false);
-const exportPdfTarget = ref<'note' | 'journal' | null>(null);
+const exportPdfTarget = ref<'note' | 'journal' | 'briefing' | null>(null);
 const editorDark = ref(false);
 const searchReplaceOpen = ref(false);
 const findText = ref('');
@@ -2467,7 +2470,12 @@ function applySelectionRewrite() {
   selectionRewriteRange.value = null;
 }
 
-function requestExportPdf(target: 'note' | 'journal') {
+function requestExportPdf(target: 'note' | 'journal' | 'briefing') {
+  if (target === 'briefing') {
+    if (!briefing.value) return;
+    void exportToPdf(target);
+    return;
+  }
   const targetEditor = target === 'note' ? editor.value : journalEditor.value;
   if (!targetEditor) return;
   if (targetEditor.getHTML().includes('data-hidden-text')) {
@@ -2484,13 +2492,14 @@ function confirmExportWithHidden() {
   exportPdfTarget.value = null;
 }
 
-async function exportToPdf(target: 'note' | 'journal') {
-  const targetEditor = target === 'note' ? editor.value : journalEditor.value;
+async function exportToPdf(target: 'note' | 'journal' | 'briefing') {
+  const targetEditor = target === 'note' ? editor.value : target === 'journal' ? journalEditor.value : null;
   const note = target === 'note' ? activeNote.value : null;
   const entry = target === 'journal' ? journal.value : null;
-  if (!targetEditor || (!note && !entry)) return;
-  const title = note ? (note.title || 'Untitled note') : formatJournalDate(entry!.journalDate);
-  const lastModified = new Date((note ?? entry!).updatedAt).toLocaleString();
+  const briefingNote = target === 'briefing' ? briefing.value : null;
+  if ((target !== 'briefing' && (!targetEditor || (!note && !entry))) || (target === 'briefing' && !briefingNote)) return;
+  const title = note ? (note.title || 'Untitled note') : entry ? formatJournalDate(entry.journalDate) : `Daily briefing - ${formatJournalDate(new Date().toISOString())}`;
+  const lastModified = new Date((note ?? entry ?? briefingNote)!.updatedAt).toLocaleString();
 
   const container = document.createElement('div');
   container.style.cssText = 'font-family: -apple-system, Segoe UI, sans-serif; color: #26312c; padding: 0.5rem;';
@@ -2500,7 +2509,7 @@ async function exportToPdf(target: 'note' | 'journal') {
   heading.style.cssText = 'font-size: 1.4rem; margin: 0 0 1rem;';
   heading.textContent = title;
   const body = document.createElement('div');
-  body.innerHTML = targetEditor.getHTML();
+  body.innerHTML = targetEditor ? targetEditor.getHTML() : markdown.render(briefingBodyMarkdown.value);
   const footer = document.createElement('div');
   footer.style.cssText = 'margin-top: 2rem; padding-top: 0.5rem; border-top: 1px solid #ddd; color: #888; font-size: 0.75rem;';
   footer.textContent = `Last modified: ${lastModified}`;
@@ -2956,8 +2965,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .editor, .tasks, .empty { box-sizing: border-box; width: 100%; margin: 0 auto; max-width: none; color: #34363b; }
 .editor, .tasks { display: block; position: relative; width: auto; margin: 1.5rem 1.5rem 1rem; padding: 0 0 1.5rem; border: 1px solid #e5e6e8; border-radius: 9px; background: #fff; box-shadow: 0 5px 18px #59616d0a; }
 .workspace > article.editor { border-radius: 9px; }
-.editor > header, .tasks > header { min-height: 2.8rem; flex-wrap: wrap; margin-bottom: 1.15rem; padding: 1.5rem clamp(1.25rem, 4vw, 3.5rem) 0.85rem; border-bottom: 1px solid #e5e6e8; border-radius: 8px 8px 0 0; background: #fff; }
-.editor > header { padding: 1rem; }
+.editor > header, .tasks > header { min-height: 2.8rem; flex-wrap: wrap; margin-bottom: 1.15rem; padding: 1rem; border-bottom: 1px solid #e5e6e8; border-radius: 8px 8px 0 0; background: #fff; }
 .editor header input, .editor header strong, .tasks h2 { color: #24252a; font-size: 1.55rem; font-weight: 650; letter-spacing: -0.02em; }
 .editor :is(input, button, .prose-editor):focus-visible { outline: none; }
 .save-status { margin-left: auto; color: #999ca3; font-size: 0.67rem; }
@@ -3065,7 +3073,9 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .carry-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid #f2e2dc; border-bottom-color: #eeeafd; font-size: 0.78rem; }
 .carry-item > span { flex: 1; min-width: 0; }
 .carry-item > button { flex: 0 0 auto; }
-.briefing-content { padding: 1.35rem; background: #fff; border: 1px solid #e3e4e7; border-radius: 9px; line-height: 1.75; margin: 1.5rem clamp(1.25rem, 4vw, 3.5rem) 0; color: #4b4d54; font-size: 0.88rem; box-shadow: 0 5px 18px #59616d0a; }
+.briefing-actions { display: flex; gap: 0.45rem; }
+.briefing-date { margin-left: 0.45rem; color: #92959c; font-size: 0.75rem; font-weight: 500; }
+.briefing-content { padding: 1.35rem; background: #fff; border: 0; line-height: 1.75; margin: 0.75rem clamp(1.25rem, 4vw, 0.5rem) 0; color: #4b4d54; font-size: 0.88rem; box-shadow: none; }
 .empty { margin-top: 20vh; padding: 5rem 2rem; width: auto; margin: 1.5rem 1.5rem 1rem; text-align: center; }
 .empty h2 { color: #2b2c31; font-size: 1.3rem; }
 .empty button { padding: 0.65rem 0.9rem; border-radius: 7px; color: #fff; background: #8b5cf6; font-size: 0.75rem; }
@@ -3138,7 +3148,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
   .dashboard-grid { grid-template-columns: 1fr; gap: 1.5rem; }
   .briefing-section { grid-column: auto; }
   .today-section { padding-left: 0; }
-  .editor, .tasks, .empty { margin: 1.5rem 0.4rem 2rem; }.tasks { padding-bottom: 1rem; }.tasks > :not(header) { margin-inline: 0.75rem; }.tasks > header { padding-inline: 0.75rem; }
+  .editor, .tasks, .empty { margin: 1.5rem 0.4rem 2rem; }.tasks { padding-bottom: 1rem; }.tasks > :not(header) { margin-inline: 0.75rem; }
   .settings-form, .platform-settings { grid-template-columns: 1fr; }.platform-settings > div { border-right: 0 !important; }.platform-settings > div:not(:last-child) { border-bottom: 1px solid #ececef; }.platform-settings > div:last-child { border-bottom: 0; }
   .managed-user { grid-template-columns: minmax(0, 1fr) 5.5rem; }.managed-user button { grid-column: 1 / -1; }
   .editor header input, .editor header strong { font-size: 1.75rem; }
