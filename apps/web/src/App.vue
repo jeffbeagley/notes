@@ -285,7 +285,7 @@
         </div>
       </article>
       <article v-if="activeNote" class="editor" :class="{ 'editor-dark': editorDark }">
-        <header><input v-model="activeNote.title" aria-label="Note title" @input="queueSave" /><span class="save-status">{{ saveStatus }}</span><button class="quiet" title="Open note assistant" @click="noteAssistantOpen = true"><MessageSquare :size="15" :stroke-width="1.8" />Assistant</button><button class="quiet" title="Save version" @click="saveNow('manual')">Save version</button><button class="quiet" title="Version history" @click="toggleVersions">History</button><button class="quiet" title="Archive note" @click="archiveNote">Archive</button><button class="quiet delete-note" title="Delete note" @click="deleteConfirmOpen = true"><Trash2 :size="15" /></button></header>
+        <header><input v-model="activeNote.title" aria-label="Note title" @input="queueSave" /><span class="save-status">{{ saveStatus }}</span><button class="quiet" title="Open note assistant" @click="noteAssistantOpen = true"><MessageSquare :size="15" :stroke-width="1.8" />Assistant</button><button class="quiet" title="Save version" @click="saveNow('manual')">Save version</button><button class="quiet" title="Version history" @click="toggleVersions">History</button><button class="quiet" title="Export to PDF" :disabled="exportingPdf" @click="requestExportPdf('note')">{{ exportingPdf ? 'Exporting...' : 'Export PDF' }}</button><button class="quiet" title="Archive note" @click="archiveNote">Archive</button><button class="quiet delete-note" title="Delete note" @click="deleteConfirmOpen = true"><Trash2 :size="15" /></button></header>
         <section class="note-organization" aria-label="Note organization">
           <label>Notebook <select v-model="activeNote.notebookId" aria-label="Note notebook" @change="saveNoteOrganization"><option :value="null">Unfiled</option><optgroup v-for="place in places" :key="place.id" :label="place.name"><option v-for="notebook in notebooksByPlace.get(place.id) ?? []" :key="notebook.id" :value="notebook.id">{{ notebook.name }}</option></optgroup></select></label>
           <label>Tags <span class="tag-pills"><span v-if="!noteTagsList.length" class="tag-pill-empty">No tags</span><span v-for="tag in noteTagsList" :key="tag" class="tag-pill">{{ tag }}<button type="button" class="tag-pill-remove" :aria-label="`Remove tag ${tag}`" @click="removeNoteTag(tag)"><X :size="11" /></button></span><button type="button" class="tag-pill-add" title="Manage tags" @click="openTagModal"><Plus :size="14" /></button></span></label>
@@ -313,7 +313,7 @@
           <button class="quiet" title="Older entry" :disabled="!canGoOlderJournal" @click="goToAdjacentJournal('older')"><ChevronLeft :size="15" :stroke-width="1.8" /></button>
           <strong>{{ isHistoricalJournal ? formatJournalDate(journal.journalDate) : 'Today' }}</strong>
           <button class="quiet" title="Newer entry" :disabled="!canGoNewerJournal" @click="goToAdjacentJournal('newer')"><ChevronRight :size="15" :stroke-width="1.8" /></button>
-          <span class="save-status">{{ journalSaveStatus }}</span><button class="quiet" title="Open journal assistant" @click="journalAssistantOpen = true"><MessageSquare :size="15" :stroke-width="1.8" />Assistant</button><button class="quiet" title="Save journal version" @click="saveJournal('manual')">Save version</button><button v-if="!isHistoricalJournal" class="quiet" title="Journal version history" @click="toggleVersions">History</button></header>
+          <span class="save-status">{{ journalSaveStatus }}</span><button class="quiet" title="Open journal assistant" @click="journalAssistantOpen = true"><MessageSquare :size="15" :stroke-width="1.8" />Assistant</button><button class="quiet" title="Save journal version" @click="saveJournal('manual')">Save version</button><button v-if="!isHistoricalJournal" class="quiet" title="Journal version history" @click="toggleVersions">History</button><button class="quiet" title="Export to PDF" :disabled="exportingPdf" @click="requestExportPdf('journal')">{{ exportingPdf ? 'Exporting...' : 'Export PDF' }}</button></header>
         <button v-if="journal.suggestedCarryForward?.suggestions?.length" class="carry-forward-toggle" :aria-expanded="carryForwardOpen" @click="carryForwardOpen = !carryForwardOpen"><List :size="15" :stroke-width="1.8" />Suggested items <span>{{ journal.suggestedCarryForward.suggestions.length }}</span></button>
         <section v-if="journal.suggestedCarryForward?.suggestions?.length" class="carry-forward-panel" :class="{ 'carry-forward-expanded': carryForwardOpen }">
           <h3>Suggested carry-forward items</h3>
@@ -432,6 +432,7 @@
         </div>
       </article>
       <article v-else-if="view === 'notes'" class="empty"><h2>No note selected</h2><button @click="createNote(null)">Create note</button></article>
+      <div v-if="exportHiddenConfirmOpen" class="confirm-backdrop" role="presentation"><section class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="export-hidden-title"><h2 id="export-hidden-title">Hidden text will be included</h2><p>This document contains hidden text. Exporting to PDF will reveal that hidden content in the exported file.</p><div><button class="quiet" @click="exportHiddenConfirmOpen = false">Cancel</button><button @click="confirmExportWithHidden">Export anyway</button></div></section></div>
       <div v-if="user.forcePasswordChange" class="confirm-backdrop">
         <form class="confirm-dialog password-change-dialog" aria-labelledby="password-change-title" @submit.prevent="changePassword">
           <h2 id="password-change-title">Choose a new password</h2>
@@ -494,6 +495,7 @@ import CodeBlockView from './components/CodeBlockView.vue';
 import { HiddenText } from './extensions/HiddenText';
 import hljs from 'highlight.js';
 import MarkdownIt from 'markdown-it';
+import html2pdf from 'html2pdf.js';
 import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ArrowUpRight, BarChart3, Bold, Book, BookOpen, Calendar, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, Code2, FileText, GripVertical, Heading2, Highlighter, HelpCircle, Home, ImagePlus, Italic, LayoutGrid, Library, Link2, List, ListChecks, Menu, MessageSquare, Moon, PanelLeft, Plus, Quote, Redo2, Replace, Rows3, Search, Settings, Sparkles, Star, Strikethrough, Subscript as SubscriptIcon, Superscript as SuperscriptIcon, Sun, Trash2, Underline as UnderlineIcon, Undo2, X } from '@lucide/vue';
 
 type User = { id: string; username: string; displayName: string | null; role: string; timezone: string; forcePasswordChange: boolean };
@@ -752,6 +754,9 @@ const journalArchiveMonth = ref<string | null>(null);
 const versions = ref<DocumentVersion[]>([]);
 const versionsOpen = ref(false);
 const deleteConfirmOpen = ref(false);
+const exportingPdf = ref(false);
+const exportHiddenConfirmOpen = ref(false);
+const exportPdfTarget = ref<'note' | 'journal' | null>(null);
 const editorDark = ref(false);
 const searchReplaceOpen = ref(false);
 const findText = ref('');
@@ -2460,6 +2465,54 @@ function applySelectionRewrite() {
   selectionRewriteOpen.value = false;
   selectionRewriteSuggestion.value = '';
   selectionRewriteRange.value = null;
+}
+
+function requestExportPdf(target: 'note' | 'journal') {
+  const targetEditor = target === 'note' ? editor.value : journalEditor.value;
+  if (!targetEditor) return;
+  if (targetEditor.getHTML().includes('data-hidden-text')) {
+    exportPdfTarget.value = target;
+    exportHiddenConfirmOpen.value = true;
+    return;
+  }
+  void exportToPdf(target);
+}
+
+function confirmExportWithHidden() {
+  exportHiddenConfirmOpen.value = false;
+  if (exportPdfTarget.value) void exportToPdf(exportPdfTarget.value);
+  exportPdfTarget.value = null;
+}
+
+async function exportToPdf(target: 'note' | 'journal') {
+  const targetEditor = target === 'note' ? editor.value : journalEditor.value;
+  const note = target === 'note' ? activeNote.value : null;
+  const entry = target === 'journal' ? journal.value : null;
+  if (!targetEditor || (!note && !entry)) return;
+  const title = note ? (note.title || 'Untitled note') : formatJournalDate(entry!.journalDate);
+  const lastModified = new Date((note ?? entry!).updatedAt).toLocaleString();
+
+  const container = document.createElement('div');
+  container.style.cssText = 'font-family: -apple-system, Segoe UI, sans-serif; color: #26312c; padding: 0.5rem;';
+  const style = document.createElement('style');
+  style.textContent = '[data-hidden-text] { color: inherit !important; text-shadow: none !important; }';
+  const heading = document.createElement('h1');
+  heading.style.cssText = 'font-size: 1.4rem; margin: 0 0 1rem;';
+  heading.textContent = title;
+  const body = document.createElement('div');
+  body.innerHTML = targetEditor.getHTML();
+  const footer = document.createElement('div');
+  footer.style.cssText = 'margin-top: 2rem; padding-top: 0.5rem; border-top: 1px solid #ddd; color: #888; font-size: 0.75rem;';
+  footer.textContent = `Last modified: ${lastModified}`;
+  container.append(style, heading, body, footer);
+
+  exportingPdf.value = true;
+  try {
+    const filename = `${title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'export'}.pdf`;
+    await html2pdf().set({ margin: 12, filename, html2canvas: { scale: 2 }, jsPDF: { unit: 'pt', format: 'letter' } }).from(container).save();
+  } finally {
+    exportingPdf.value = false;
+  }
 }
 
 async function deleteNote() {
