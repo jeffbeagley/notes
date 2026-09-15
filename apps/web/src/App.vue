@@ -290,7 +290,7 @@
           <label>Notebook <select v-model="activeNote.notebookId" aria-label="Note notebook" @change="saveNoteOrganization"><option :value="null">Unfiled</option><optgroup v-for="place in places" :key="place.id" :label="place.name"><option v-for="notebook in notebooksByPlace.get(place.id) ?? []" :key="notebook.id" :value="notebook.id">{{ notebook.name }}</option></optgroup></select></label>
           <label>Tags <span class="tag-input"><input v-model="noteTagsInput" aria-label="Note tags" placeholder="project, meeting" @change="saveNoteOrganization" /><button type="button" title="Suggest and manage tags with AI" @click="openTagModal"><Sparkles :size="15" /></button></span></label>
         </section>
-        <label class="upload-control" for="note-image-upload"><ImagePlus :size="14" :stroke-width="1.8" />Add image</label><input id="note-image-upload" class="image-upload-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" @change="uploadImage" /><RichTextToolbar :editor="editor" :is-dark="editorDark" :search-open="searchReplaceOpen" @upload="uploadImage" @insert-code="openCodeInsertModal('note')" @rewrite-selection="openSelectionRewriteModal" @toggle-search="searchReplaceOpen = !searchReplaceOpen" @toggle-theme="editorDark = !editorDark" />
+        <label class="upload-control" for="note-image-upload"><ImagePlus :size="14" :stroke-width="1.8" />Add image</label><input id="note-image-upload" class="image-upload-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp" @change="uploadImage" /><RichTextToolbar :editor="editor" :is-dark="editorDark" :search-open="searchReplaceOpen" @upload="uploadImage" @insert-code="openCodeInsertModal('note')" @rewrite-selection="openSelectionRewriteModal('note')" @toggle-search="searchReplaceOpen = !searchReplaceOpen" @toggle-theme="editorDark = !editorDark" />
         <nav class="editor-toolbar" aria-label="Editor controls"><button title="Undo" @click="editor?.chain().focus().undo().run()"><Undo2 :size="16" /></button><button title="Redo" @click="editor?.chain().focus().redo().run()"><Redo2 :size="16" /></button><span class="toolbar-divider" /><button title="Heading" @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()"><Heading2 :size="16" /></button><button title="Bullet list" @click="editor?.chain().focus().toggleBulletList().run()"><List :size="16" /></button><button title="Task list" @click="editor?.chain().focus().toggleTaskList().run()"><ListChecks :size="16" /></button><button title="Blockquote" @click="editor?.chain().focus().toggleBlockquote().run()"><Quote :size="16" /></button><button title="Code block" @click="editor?.chain().focus().toggleCodeBlock().run()"><Code2 :size="16" /></button><span class="toolbar-divider" /><button title="Bold" @click="editor?.chain().focus().toggleBold().run()"><Bold :size="16" /></button><button title="Italic" @click="editor?.chain().focus().toggleItalic().run()"><Italic :size="16" /></button><button title="Strikethrough" @click="editor?.chain().focus().toggleStrike().run()"><Strikethrough :size="16" /></button><button title="Underline" @click="editor?.chain().focus().toggleUnderline().run()"><UnderlineIcon :size="16" /></button><button title="Highlight" @click="editor?.chain().focus().toggleHighlight().run()"><Highlighter :size="16" /></button><button title="Inline code" @click="editor?.chain().focus().toggleCode().run()"><Code2 :size="16" /></button><button title="Link" @click="applyNoteLink"><Link2 :size="16" /></button><button title="Superscript" @click="editor?.chain().focus().toggleSuperscript().run()"><SuperscriptIcon :size="16" /></button><button title="Subscript" @click="editor?.chain().focus().toggleSubscript().run()"><SubscriptIcon :size="16" /></button><span class="toolbar-divider" /><button title="Align left" @click="editor?.chain().focus().setTextAlign('left').run()"><AlignLeft :size="16" /></button><button title="Align center" @click="editor?.chain().focus().setTextAlign('center').run()"><AlignCenter :size="16" /></button><button title="Align right" @click="editor?.chain().focus().setTextAlign('right').run()"><AlignRight :size="16" /></button><button title="Align justify" @click="editor?.chain().focus().setTextAlign('justify').run()"><AlignJustify :size="16" /></button><span class="toolbar-divider" /><button title="Add image" @click="openImagePicker"><ImagePlus :size="16" /><span class="toolbar-add-label">Add</span></button><span class="toolbar-spacer" /><button title="Search and replace" @click="searchReplaceOpen = !searchReplaceOpen"><Replace :size="16" /></button><button :title="editorDark ? 'Switch to light mode' : 'Switch to dark mode'" @click="editorDark = !editorDark"> <Sun v-if="editorDark" :size="16" /><Moon v-else :size="16" /></button></nav>
         <div v-if="searchReplaceOpen" class="search-replace-panel"><input v-model="findText" placeholder="Find" aria-label="Find text" /><input v-model="replaceText" placeholder="Replace" aria-label="Replace text" /><button @click="replaceNext">Replace next</button><button @click="replaceAll">Replace all</button></div>
         <EditorContent v-if="editor" :editor="editor" class="tiptap-editor" @mousedown="focusEditorAtPointer" />
@@ -323,7 +323,7 @@
             <button class="quiet" @click="dismissCarryForward(s)">Dismiss</button>
           </div>
         </section>
-        <RichTextToolbar :editor="journalEditor" :is-dark="editorDark" :search-open="searchReplaceOpen" @upload="uploadImage" @insert-code="openCodeInsertModal('journal')" @toggle-search="searchReplaceOpen = !searchReplaceOpen" @toggle-theme="editorDark = !editorDark" />
+        <RichTextToolbar :editor="journalEditor" :is-dark="editorDark" :search-open="searchReplaceOpen" @upload="uploadImage" @insert-code="openCodeInsertModal('journal')" @rewrite-selection="openSelectionRewriteModal('journal')" @toggle-search="searchReplaceOpen = !searchReplaceOpen" @toggle-theme="editorDark = !editorDark" />
         <nav class="editor-toolbar" aria-label="Journal editor controls"><button title="Undo" @click="journalEditor?.chain().focus().undo().run()"><Undo2 :size="16" /></button><button title="Redo" @click="journalEditor?.chain().focus().redo().run()"><Redo2 :size="16" /></button><span class="toolbar-divider" /><button title="Heading" @click="journalEditor?.chain().focus().toggleHeading({ level: 2 }).run()"><Heading2 :size="16" /></button><button title="Bullet list" @click="journalEditor?.chain().focus().toggleBulletList().run()"><List :size="16" /></button><button title="Task list" @click="journalEditor?.chain().focus().toggleTaskList().run()"><ListChecks :size="16" /></button><span class="toolbar-divider" /><button title="Bold" @click="journalEditor?.chain().focus().toggleBold().run()"><Bold :size="16" /></button><button title="Italic" @click="journalEditor?.chain().focus().toggleItalic().run()"><Italic :size="16" /></button><button title="Strikethrough" @click="journalEditor?.chain().focus().toggleStrike().run()"><Strikethrough :size="16" /></button><button title="Underline" @click="journalEditor?.chain().focus().toggleUnderline().run()"><UnderlineIcon :size="16" /></button><button title="Highlight" @click="journalEditor?.chain().focus().toggleHighlight().run()"><Highlighter :size="16" /></button><button title="Code block" @click="journalEditor?.chain().focus().toggleCodeBlock().run()"><Code2 :size="16" /></button><button title="Link" @click="applyJournalLink"><Link2 :size="16" /></button><button title="Superscript" @click="journalEditor?.chain().focus().toggleSuperscript().run()"><SuperscriptIcon :size="16" /></button><button title="Subscript" @click="journalEditor?.chain().focus().toggleSubscript().run()"><SubscriptIcon :size="16" /></button><span class="toolbar-divider" /><button title="Align left" @click="journalEditor?.chain().focus().setTextAlign('left').run()"><AlignLeft :size="16" /></button><button title="Align center" @click="journalEditor?.chain().focus().setTextAlign('center').run()"><AlignCenter :size="16" /></button><button title="Align right" @click="journalEditor?.chain().focus().setTextAlign('right').run()"><AlignRight :size="16" /></button><button title="Justify" @click="journalEditor?.chain().focus().setTextAlign('justify').run()"><AlignJustify :size="16" /></button></nav>
         <div v-if="searchReplaceOpen" class="search-replace-panel"><input v-model="findText" placeholder="Find" aria-label="Find text" /><input v-model="replaceText" placeholder="Replace" aria-label="Replace text" /><button @click="replaceNext">Replace next</button><button @click="replaceAll">Replace all</button></div>
         <EditorContent v-if="journalEditor" :editor="journalEditor" class="tiptap-editor" @mousedown="focusEditorAtPointer" />
@@ -337,6 +337,7 @@
           </aside>
         </div>
         <aside v-if="versionsOpen" class="versions"><header><h2>Version history</h2><button title="Close version history" @click="versionsOpen = false">Close</button></header><p v-if="!versions.length">No saved versions yet.</p><div v-for="item in versions" :key="item.id" class="version"><span>v{{ item.versionN }} · {{ item.source }} · {{ new Date(item.createdAt).toLocaleString() }}</span><button @click="restoreVersion(item.id)">Restore</button></div></aside>
+        <div v-if="selectionRewriteOpen" class="confirm-backdrop"><section class="confirm-dialog ai-dialog rewrite-dialog" role="dialog" aria-modal="true" aria-labelledby="rewrite-ai-title"><header><h2 id="rewrite-ai-title">Rewrite selection</h2><button class="quiet" @click="selectionRewriteOpen = false">Close</button></header><label>Style <select v-model="rewriteStyle" aria-label="Rewrite style"><option value="Improve clarity and concision.">Clear and concise</option><option value="Make the tone more professional while preserving meaning.">Professional</option><option value="Make the tone warmer and friendlier while preserving meaning.">Friendly</option><option value="Simplify the language while preserving meaning.">Simplify</option></select></label><label>Additional instruction <input v-model="rewriteInstruction" aria-label="Additional rewrite instruction" placeholder="Optional instruction" /></label><div class="rewrite-source"><strong>Selected text</strong><p>{{ selectionRewriteText }}</p></div><button :disabled="aiLoading === 'rewrite'" @click="requestSelectionRewrite">{{ aiLoading === 'rewrite' ? 'Generating...' : 'Generate rewrite' }}</button><p v-if="aiError" class="error">{{ aiError }}</p><div v-if="selectionRewriteSuggestion" class="rewrite-diff"><strong>Review changes</strong><del>{{ selectionRewriteText }}</del><ins>{{ selectionRewriteSuggestion }}</ins></div><div class="dialog-actions"><button class="quiet" @click="selectionRewriteOpen = false">Cancel</button><button :disabled="!selectionRewriteSuggestion" @click="applySelectionRewrite">Apply replacement</button></div></section></div>
       </article>
       <article v-else-if="view === 'journalArchive'" class="tasks journal-archive">
         <header><h2>Journal archive</h2><button class="quiet" @click="openJournal">Open today</button></header>
@@ -543,6 +544,7 @@ const suggestedTags = ref<string[]>([]);
 const selectionRewriteOpen = ref(false);
 const selectionRewriteText = ref('');
 const selectionRewriteRange = ref<{ from: number; to: number } | null>(null);
+const rewriteTarget = ref<'note' | 'journal'>('note');
 const rewriteStyle = ref('Improve clarity and concision.');
 const rewriteInstruction = ref('');
 const selectionRewriteSuggestion = ref('');
@@ -2312,12 +2314,15 @@ async function saveTagModal() {
   if (!libraryError.value) tagModalOpen.value = false;
 }
 
-function openSelectionRewriteModal() {
-  const note = activeNote.value;
-  const selection = editor.value?.state.selection;
-  if (!note || !selection || selection.empty) return;
+function openSelectionRewriteModal(target: 'note' | 'journal') {
+  const targetEditor = target === 'note' ? editor.value : journalEditor.value;
+  if (target === 'note' && !activeNote.value) return;
+  if (target === 'journal' && !journal.value) return;
+  const selection = targetEditor?.state.selection;
+  if (!selection || selection.empty) return;
+  rewriteTarget.value = target;
   selectionRewriteRange.value = { from: selection.from, to: selection.to };
-  selectionRewriteText.value = editor.value?.state.doc.textBetween(selection.from, selection.to, '\n') ?? '';
+  selectionRewriteText.value = targetEditor?.state.doc.textBetween(selection.from, selection.to, '\n') ?? '';
   selectionRewriteSuggestion.value = '';
   aiError.value = '';
   selectionRewriteOpen.value = Boolean(selectionRewriteText.value.trim());
@@ -2325,12 +2330,17 @@ function openSelectionRewriteModal() {
 
 async function requestSelectionRewrite() {
   const note = activeNote.value;
-  if (!note || !selectionRewriteText.value) return;
+  const entry = journal.value;
+  if (!selectionRewriteText.value) return;
+  const endpoint = rewriteTarget.value === 'note'
+    ? (note ? `/api/v1/notes/${note.id}/suggest-selection-rewrite` : null)
+    : (entry ? `/api/v1/journals/${entry.journalDate.slice(0, 10)}/suggest-selection-rewrite` : null);
+  if (!endpoint) return;
   aiLoading.value = 'rewrite';
   aiError.value = '';
   try {
     const instruction = [rewriteStyle.value, rewriteInstruction.value.trim()].filter(Boolean).join(' ');
-    const response = await fetch(`/api/v1/notes/${note.id}/suggest-selection-rewrite`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ selectedText: selectionRewriteText.value, instruction }) });
+    const response = await fetch(endpoint, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ selectedText: selectionRewriteText.value, instruction }) });
     const body = await response.json() as { suggestion?: string; error?: string };
     if (!response.ok || !body.suggestion) throw new Error(body.error ?? 'Unable to generate a rewrite');
     selectionRewriteSuggestion.value = body.suggestion;
@@ -2343,8 +2353,9 @@ async function requestSelectionRewrite() {
 
 function applySelectionRewrite() {
   const range = selectionRewriteRange.value;
-  if (!range || !selectionRewriteSuggestion.value || !editor.value) return;
-  editor.value.chain().focus().setTextSelection(range).insertContent(selectionRewriteSuggestion.value).run();
+  const targetEditor = rewriteTarget.value === 'note' ? editor.value : journalEditor.value;
+  if (!range || !selectionRewriteSuggestion.value || !targetEditor) return;
+  targetEditor.chain().focus().setTextSelection(range).insertContent(selectionRewriteSuggestion.value).run();
   selectionRewriteOpen.value = false;
   selectionRewriteSuggestion.value = '';
   selectionRewriteRange.value = null;
