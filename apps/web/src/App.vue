@@ -2802,6 +2802,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .editor, .tasks { display: block; position: relative; width: auto; margin: 2.5rem 3.5rem 3rem; padding: 0 0 1.5rem; border: 1px solid #e5e6e8; border-radius: 9px; background: #fff; box-shadow: 0 5px 18px #59616d0a; }
 .workspace > article.editor { border-radius: 9px; }
 .editor > header, .tasks > header { min-height: 2.8rem; flex-wrap: wrap; margin-bottom: 1.15rem; padding: 1.5rem clamp(1.25rem, 4vw, 3.5rem) 0.85rem; border-bottom: 1px solid #e5e6e8; border-radius: 8px 8px 0 0; background: #fff; }
+.editor > header { padding: 1rem; }
 .editor header input, .editor header strong, .tasks h2 { color: #24252a; font-size: 1.55rem; font-weight: 650; letter-spacing: -0.02em; }
 .editor :is(input, button, .prose-editor):focus-visible { outline: none; }
 .save-status { margin-left: auto; color: #999ca3; font-size: 0.67rem; }
