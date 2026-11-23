@@ -11,7 +11,7 @@
       <div v-if="oidcEnabled" class="login-divider"><span>or sign in with password</span></div>
       <p v-if="error" class="error">{{ error }}</p>
     </form>
-    <section v-else class="workspace" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+    <section v-else class="workspace" :class="{ 'sidebar-collapsed': sidebarCollapsed, 'sidebar-resizing': sidebarResizing }" :style="{ '--sidebar-width': `${sidebarWidth}px` }">
       <aside class="app-sidebar" :class="{ 'mobile-nav-open': mobileNavOpen }">
         <div class="sidebar-heading"><button class="brand" title="Go to home" @click="goHome"><span class="brand-mark">N</span><span class="nav-label">Notes</span></button><button class="sidebar-toggle" :aria-expanded="!sidebarCollapsed" :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'" @click="sidebarCollapsed = !sidebarCollapsed"><PanelLeft :size="15" :stroke-width="1.8" /></button></div>
         <nav class="primary-nav" aria-label="Primary navigation" @click="mobileNavOpen = false">
@@ -77,6 +77,21 @@
           <button class="profile-card" @click="logout"><span class="avatar">{{ (user.displayName || user.username).slice(0, 1).toUpperCase() }}</span><span class="profile-copy nav-label"><strong>{{ user.displayName || user.username }}</strong><small>Sign out</small></span><ChevronDown class="profile-chevron" :size="14" :stroke-width="1.8" /></button>
         </div>
       </aside>
+      <div
+        v-if="!sidebarCollapsed"
+        class="sidebar-resizer"
+        role="separator"
+        aria-label="Resize navigation sidebar"
+        aria-orientation="vertical"
+        :aria-valuemin="SIDEBAR_MIN_WIDTH"
+        :aria-valuemax="SIDEBAR_MAX_WIDTH"
+        :aria-valuenow="sidebarWidth"
+        tabindex="0"
+        title="Drag to resize navigation; double-click to reset"
+        @pointerdown="startSidebarResize"
+        @dblclick="resetSidebarWidth"
+        @keydown="handleSidebarResizeKey"
+      />
       <button v-if="mobileNavOpen" class="mobile-nav-backdrop" aria-label="Close navigation" @click="mobileNavOpen = false" />
       <header class="workspace-topbar">
         <button class="mobile-nav-toggle" :aria-expanded="mobileNavOpen" aria-label="Open navigation" @click="mobileNavOpen = !mobileNavOpen"><Menu :size="18" :stroke-width="1.8" /></button>
@@ -571,6 +586,14 @@ const briefing = ref<Note | null>(null);
 const generatingBriefing = ref(false);
 const activeSummaryTitle = ref<string | null>(null);
 const sidebarCollapsed = ref(false);
+const SIDEBAR_DEFAULT_WIDTH = 216;
+const SIDEBAR_MIN_WIDTH = 216;
+const SIDEBAR_MAX_WIDTH = 480;
+const storedSidebarWidth = Number(localStorage.getItem('notes-sidebar-width'));
+const sidebarWidth = ref(Number.isFinite(storedSidebarWidth) ? Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, storedSidebarWidth)) : SIDEBAR_DEFAULT_WIDTH);
+const sidebarResizing = ref(false);
+let sidebarResizeStartX = 0;
+let sidebarResizeStartWidth = SIDEBAR_DEFAULT_WIDTH;
 const mobileNavOpen = ref(false);
 const assistantHistoryOpen = ref(false);
 const view = ref<'home' | 'notes' | 'places' | 'place' | 'notebook' | 'unfiled' | 'journal' | 'journalArchive' | 'journalEntry' | 'tasks' | 'briefing' | 'search' | 'assistant' | 'summaries' | 'settings'>('home');
@@ -2733,6 +2756,49 @@ watch([activeNote, journal, view, isHistoricalJournal], () => {
 
 watch(() => route.fullPath, () => void syncRoute());
 
+function setSidebarWidth(width: number, persist = false) {
+  sidebarWidth.value = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(width)));
+  if (persist) localStorage.setItem('notes-sidebar-width', String(sidebarWidth.value));
+}
+
+function resizeSidebar(event: PointerEvent) {
+  setSidebarWidth(sidebarResizeStartWidth + event.clientX - sidebarResizeStartX);
+}
+
+function stopSidebarResize() {
+  if (!sidebarResizing.value) return;
+  sidebarResizing.value = false;
+  window.removeEventListener('pointermove', resizeSidebar);
+  window.removeEventListener('pointerup', stopSidebarResize);
+  window.removeEventListener('pointercancel', stopSidebarResize);
+  localStorage.setItem('notes-sidebar-width', String(sidebarWidth.value));
+}
+
+function startSidebarResize(event: PointerEvent) {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  sidebarResizeStartX = event.clientX;
+  sidebarResizeStartWidth = sidebarWidth.value;
+  sidebarResizing.value = true;
+  window.addEventListener('pointermove', resizeSidebar);
+  window.addEventListener('pointerup', stopSidebarResize);
+  window.addEventListener('pointercancel', stopSidebarResize);
+}
+
+function resetSidebarWidth() {
+  setSidebarWidth(SIDEBAR_DEFAULT_WIDTH, true);
+}
+
+function handleSidebarResizeKey(event: KeyboardEvent) {
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+    event.preventDefault();
+    setSidebarWidth(sidebarWidth.value + (event.key === 'ArrowRight' ? 16 : -16), true);
+  } else if (event.key === 'Home' || event.key === 'End') {
+    event.preventDefault();
+    setSidebarWidth(event.key === 'Home' ? SIDEBAR_MIN_WIDTH : SIDEBAR_MAX_WIDTH, true);
+  }
+}
+
 onMounted(async () => {
   window.addEventListener('keydown', handleKeydown);
   try {
@@ -2754,7 +2820,10 @@ onBeforeUnmount(() => {
   void saveNow();
   void saveJournal();
 });
-onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown);
+  stopSidebarResize();
+});
 </script>
 
 <style>
@@ -2811,7 +2880,7 @@ input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; color:
 /* Main workspace presentation */
 :root { color: #1c1d21; background: #eef0f2; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 body { margin: 0; min-width: 0; background: #eef0f2; }
-.workspace { display: grid; grid-template-columns: 13.5rem minmax(0, 1fr); min-height: 100vh; grid-template-rows: 3.5rem minmax(0, 1fr); gap: 0; padding: 0; box-sizing: border-box; }
+.workspace { --sidebar-width: 13.5rem; display: grid; position: relative; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: 100vh; grid-template-rows: 3.5rem minmax(0, 1fr); gap: 0; padding: 0; box-sizing: border-box; }
 .workspace > aside { display: flex; flex-direction: column; gap: 0.3rem; padding: 1.5rem 0.9rem 1rem; background: #173d36; color: #e7e9dd; grid-row: 1 / -1; }
 .workspace > article { grid-column: 2; grid-row: 2; }
 .workspace-topbar { display: flex; align-items: center; gap: 0.75rem; min-width: 0; overflow: visible; padding: 0 1.2rem; border-bottom: 1px solid #e4e5e7; }
@@ -2842,7 +2911,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .note-link.active .nav-icon { color: #8055eb; }
 .sidebar-section-label { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0.55rem 0.35rem; border-top: 1px solid #eeeff1; color: #a2a5ab; font-size: 0.67rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 .sidebar-section-label button { padding: 0; color: #858991; background: transparent; font-size: 1rem; }
-.library-tree { display: grid; gap: 0.1rem; max-height: 24rem; overflow-y: auto; padding: 0 0.05rem 0.4rem; }
+.library-tree { display: grid; gap: 0.1rem; max-height: 24rem; overflow-x: hidden; overflow-y: auto; padding: 0 0.05rem 0.4rem; }
 .tree-row { display: flex; align-items: center; gap: 0.1rem; border-radius: 7px; }
 .tree-row.is-drop-target { box-shadow: inset 0 0 0 1.5px #8055eb; background: #f6f3ff; }
 .tree-row .tree-link { min-width: 0; flex: 1; }
@@ -2858,6 +2927,12 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .sidebar-error { margin: 0.3rem 0.55rem 0; color: #b64b42; font-size: 0.65rem; }
 .sidebar-collapsed .library-tree { max-height: none; }
 .sidebar-collapsed .tree-twisty, .sidebar-collapsed .tree-add, .sidebar-collapsed .tree-children { display: none; }
+.sidebar-resizer { position: absolute; top: 0.5rem; bottom: 0.5rem; left: calc(var(--sidebar-width) - 0.3rem); z-index: 8; width: 0.6rem; padding: 0; border-radius: 0; cursor: col-resize; touch-action: none; background: transparent; }
+.sidebar-resizer::after { content: ''; position: absolute; top: 0.75rem; right: 0.25rem; bottom: 0.75rem; width: 2px; border-radius: 999px; background: transparent; transition: background 120ms; }
+.sidebar-resizer:hover::after, .sidebar-resizer:focus-visible::after, .sidebar-resizing .sidebar-resizer::after { background: #8b5cf6; }
+.sidebar-resizer:focus-visible { outline: 2px solid #8b5cf6; outline-offset: -2px; }
+.sidebar-resizing, .sidebar-resizing * { cursor: col-resize !important; user-select: none; }
+.sidebar-collapsed .sidebar-resizer { display: none; }
 
 .library-view { display: flex; flex-direction: column; gap: 1.25rem; padding: 1.5rem 1.5rem 1rem; overflow-y: auto; }
 .library-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
@@ -3142,6 +3217,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
   .workspace > aside.app-sidebar.mobile-nav-open { transform: translateX(0); }
   .workspace > aside.app-sidebar.mobile-nav-open { overflow-y: auto; }
   .workspace > aside.app-sidebar.mobile-nav-open .library-tree { flex: 0 0 auto; min-height: 0; max-height: none; overflow: visible; }
+  .sidebar-resizer { display: none; }
   .sidebar-footer { display: grid; margin-top: 1rem; }
   .sidebar-footer { flex: 0 0 auto; }
   .home-view { padding: 1.5rem 0.4rem 2rem; }
