@@ -5,7 +5,7 @@ import type { PrismaClient } from '@prisma/client';
 import { callLlm, embeddingsAvailable, embedTexts, getLlmConfig } from './llm.js';
 import type { DocumentKind } from './context.js';
 
-const logger = pino({ level: process.env.LOG_LEVEL ?? 'info', name: 'worker' });
+const logger = pino({ level: process.env.LOG_LEVEL ?? 'info', name: 'worker' }, pino.destination(2));
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
