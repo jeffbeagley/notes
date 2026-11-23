@@ -37,3 +37,25 @@ test('MCP annotations distinguish reads, additions, and destructive updates', ()
   assert.deepEqual(localToolAnnotations('create_note'), { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false });
   assert.deepEqual(localToolAnnotations('update_note'), { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false });
 });
+
+test('queue writes fail fast when Redis is unavailable', async () => {
+  const previousRedisUrl = process.env.REDIS_URL;
+  const previousLogLevel = process.env.LOG_LEVEL;
+  process.env.REDIS_URL = 'redis://127.0.0.1:1';
+  process.env.LOG_LEVEL = 'silent';
+  const queue = await import('../src/queue.js');
+  let timeout: NodeJS.Timeout | undefined;
+  try {
+    await Promise.race([
+      queue.enqueueEmbedChunks('user-1', 'note', 'note-1'),
+      new Promise<never>((_resolve, reject) => { timeout = setTimeout(() => reject(new Error('queue write did not fail fast')), 3000); }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+    await queue.closeQueue();
+    if (previousRedisUrl === undefined) delete process.env.REDIS_URL;
+    else process.env.REDIS_URL = previousRedisUrl;
+    if (previousLogLevel === undefined) delete process.env.LOG_LEVEL;
+    else process.env.LOG_LEVEL = previousLogLevel;
+  }
+});
