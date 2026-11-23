@@ -63,6 +63,30 @@ The chart deploys the web app, API, media storage, database migration Job, optio
 
 Released images and charts are signed with keyless cosign. Images also include an SBOM and build provenance.
 
+## Import from OneNote
+
+The API image can import OneNote desktop backups (`.one`) and notebook packages
+(`.onepkg`) without OneNote, Obsidian, Microsoft Graph, or cloud credentials.
+Make the source folder available to the API container or pod as a read-only
+mount, then run:
+
+```sh
+node apps/api/dist/import-onenote.js \
+  --source /imports/onenote \
+  --username admin
+```
+
+Add `--dry-run` to parse and convert every page without writing notes or media.
+The importer maps a OneNote notebook to a place, each section (including its
+section groups) to a notebook, and each page to a note. Images, attachments,
+and ink are stored in Notes media. Dated desktop backups are reduced to the
+newest copy of each section, and reruns skip pages already imported from the
+same OneNote source ID.
+
+Keep the original notebooks or backup files until you have compared page and
+attachment counts and sampled the imported formatting. Password- or
+rights-protected sections must be unlocked before they can be imported.
+
 ## AI Is Optional
 
 Notes works fully without an AI provider. When enabled, the assistant uses an OpenAI-compatible API of your choice: OpenAI, vLLM, Ollama, LM Studio, or another compatible service.

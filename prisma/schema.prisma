@@ -96,6 +96,7 @@ model User {
   favorites              Favorite[]
   libraryViews           LibraryView[]
   assistantConversations AssistantConversation[]
+  externalImports        ExternalImport[]
 }
 
 /// Top tier of the library hierarchy (Work, Home, a project, ...), equivalent to a BookStack shelf.
@@ -198,10 +199,25 @@ model Note {
   user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   notebook        Notebook?      @relation(fields: [notebookId], references: [id], onDelete: SetNull)
   tags            NoteTag[]
+  externalImport  ExternalImport?
 
   @@unique([userId, type, periodKey])
   @@index([userId, type, updatedAt])
   @@index([userId, notebookId, sortOrder])
+}
+
+/// Stable source identity for resumable, duplicate-safe imports.
+model ExternalImport {
+  id       String @id @default(cuid())
+  userId   String
+  provider String
+  sourceId String
+  noteId   String @unique
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  note     Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider, sourceId])
+  @@index([userId, provider])
 }
 
 model NoteTag {

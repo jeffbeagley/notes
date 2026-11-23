@@ -48,6 +48,35 @@ async function writeThumbnail(content: Buffer, storageKey: string) {
   }
 }
 
+export async function storeMedia(
+  prisma: PrismaClient,
+  userId: string,
+  content: Uint8Array,
+  originalName: string,
+  mimeType: string,
+  options: { extension?: string; thumbnail?: boolean } = {},
+) {
+  const extension = (options.extension ?? originalName.match(/\.([^.]+)$/)?.[1] ?? 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+  const storageKey = `${randomUUID()}.${extension}`;
+  const buffer = Buffer.from(content);
+  await mkdir(mediaRootResolved, { recursive: true });
+  await writeFile(mediaPath(storageKey), buffer, { flag: 'wx' });
+  const thumbnailKey = options.thumbnail ? await writeThumbnail(buffer, storageKey) : null;
+  try {
+    return await prisma.media.create({ data: { userId, storageKey, thumbnailKey, originalName: basename(originalName), mimeType, byteSize: buffer.length } });
+  } catch (error) {
+    await unlink(mediaPath(storageKey)).catch(() => undefined);
+    if (thumbnailKey) await unlink(mediaPath(thumbnailKey)).catch(() => undefined);
+    throw error;
+  }
+}
+
+export async function removeStoredMedia(prisma: PrismaClient, media: { id: string; storageKey: string; thumbnailKey: string | null }) {
+  await prisma.media.delete({ where: { id: media.id } }).catch(() => undefined);
+  await unlink(mediaPath(media.storageKey)).catch(() => undefined);
+  if (media.thumbnailKey) await unlink(mediaPath(media.thumbnailKey)).catch(() => undefined);
+}
+
 export function registerMediaRoutes(app: FastifyInstance, prisma: PrismaClient) {
   app.register(multipart, { limits: { files: 1, fileSize: 10 * 1024 * 1024 } });
 
@@ -68,18 +97,8 @@ export function registerMediaRoutes(app: FastifyInstance, prisma: PrismaClient) 
     }
     const mimeType = `image/${probed.format}`;
     const extension = probed.format === 'jpeg' ? 'jpg' : probed.format;
-    const storageKey = `${randomUUID()}.${extension}`;
-    await mkdir(mediaRootResolved, { recursive: true });
-    await writeFile(mediaPath(storageKey), content, { flag: 'wx' });
-    const thumbnailKey = await writeThumbnail(content, storageKey);
-    try {
-      const media = await prisma.media.create({ data: { userId: user.id, storageKey, thumbnailKey, originalName: basename(upload.filename || `image.${extension}`), mimeType, byteSize: content.length } });
-      return reply.code(201).send({ media: { id: media.id, url: `/api/v1/media/${media.id}`, thumbnailUrl: `/api/v1/media/${media.id}?variant=thumb`, mimeType: media.mimeType, byteSize: media.byteSize } });
-    } catch (error) {
-      await unlink(mediaPath(storageKey)).catch(() => undefined);
-      if (thumbnailKey) await unlink(mediaPath(thumbnailKey)).catch(() => undefined);
-      throw error;
-    }
+    const media = await storeMedia(prisma, user.id, content, upload.filename || `image.${extension}`, mimeType, { extension, thumbnail: true });
+    return reply.code(201).send({ media: { id: media.id, url: `/api/v1/media/${media.id}`, thumbnailUrl: `/api/v1/media/${media.id}?variant=thumb`, mimeType: media.mimeType, byteSize: media.byteSize } });
   });
 
   app.get<{ Params: { id: string }; Querystring: { variant?: string } }>('/api/v1/media/:id', async (request, reply) => {
