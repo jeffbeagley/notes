@@ -6,7 +6,7 @@ import { removeStoredMedia, storeMedia } from '../media.js';
 import { convertPage } from './onefile/convert.js';
 import { readSections } from './onefile/package.js';
 
-const BACKUP_SUFFIX = / \(On \d{1,2}-\d{1,2}-\d{4}\)$/;
+const BACKUP_SUFFIX = / \(On (\d{1,2})-(\d{1,2})-(\d{4})\)$/;
 
 export interface OneNoteImportSummary {
   files: number;
@@ -24,7 +24,19 @@ interface BackupFile {
   placeName: string;
   groups: string[];
   sectionName: string;
-  modifiedMs: number;
+  versionMs: number;
+}
+
+function backupDateMs(name: string) {
+  const match = name.match(BACKUP_SUFFIX);
+  if (!match) return undefined;
+  const [, monthText, dayText, yearText] = match;
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const year = Number(yearText);
+  const value = Date.UTC(year, month - 1, day);
+  const parsed = new Date(value);
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day ? value : undefined;
 }
 
 async function walk(directory: string): Promise<string[]> {
@@ -47,11 +59,11 @@ export async function discoverOneNoteBackups(root: string): Promise<BackupFile[]
     const rawName = basename(fileName, extension);
     const sectionName = extension === '.one' ? rawName.replace(BACKUP_SUFFIX, '') : rawName;
     const placeName = extension === '.onepkg' ? rawName : parts.shift() || 'OneNote';
-    const modifiedMs = (await stat(path)).mtimeMs;
-    const file = { path, relativePath, placeName, groups: parts, sectionName, modifiedMs };
+    const versionMs = backupDateMs(rawName) ?? (await stat(path)).mtimeMs;
+    const file = { path, relativePath, placeName, groups: parts, sectionName, versionMs };
     const key = extension === '.one' ? `${dirname(relativePath).toLowerCase()}\0${sectionName.toLowerCase()}` : relativePath.toLowerCase();
     const existing = newest.get(key);
-    if (!existing || file.modifiedMs > existing.modifiedMs) newest.set(key, file);
+    if (!existing || file.versionMs > existing.versionMs) newest.set(key, file);
   }
   return [...newest.values()].sort((left, right) => left.relativePath.localeCompare(right.relativePath));
 }
@@ -86,6 +98,16 @@ function noteBookName(groups: string[], section: string) {
   return [...groups, section].filter(Boolean).join(' / ') || 'Unfiled';
 }
 
+async function indexImportedNote(prisma: PrismaClient, userId: string, importId: string, sourceId: string, note: { id: string; title: string; bodyMarkdown: string }, progress: (message: string) => void) {
+  try {
+    const { replaceContextChunks } = await import('../context.js');
+    await replaceContextChunks(prisma, userId, 'note', note.id, note.title, note.bodyMarkdown);
+    await prisma.externalImport.update({ where: { id: importId }, data: { indexedAt: new Date() } });
+  } catch (error) {
+    progress(`Imported page ${sourceId}, but search indexing failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 export async function importOneNoteBackup(options: {
   prisma: PrismaClient;
   userId: string;
@@ -109,7 +131,16 @@ export async function importOneNoteBackup(options: {
         for (const page of section.pages) {
           if (page.isDeleted) continue;
           summary.pages++;
-          if (await prisma.externalImport.findUnique({ where: { userId_provider_sourceId: { userId, provider: 'onenote', sourceId: page.id } } })) {
+          const stagedImportKey = `onenote:${page.id}`;
+          const existingImport = await prisma.externalImport.findUnique({
+            where: { userId_provider_sourceId: { userId, provider: 'onenote', sourceId: page.id } },
+            include: { note: { select: { id: true, title: true, bodyMarkdown: true } } },
+          });
+          if (existingImport) {
+            await prisma.media.updateMany({ where: { userId, stagedImportKey }, data: { stagedImportKey: null } }).catch((error) => {
+              progress(`Imported page ${page.id}, but attachment cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
+            });
+            if (!existingImport.indexedAt) await indexImportedNote(prisma, userId, existingImport.id, page.id, existingImport.note, progress);
             summary.skipped++;
             continue;
           }
@@ -132,19 +163,21 @@ export async function importOneNoteBackup(options: {
 
           const writtenMedia: Media[] = [];
           try {
+            const staleMedia = await prisma.media.findMany({ where: { userId, stagedImportKey } });
+            for (const media of staleMedia) await removeStoredMedia(prisma, media);
             const converted = await convertPage(page, {
               noteName: page.title,
               resolveInternalLink: (_title, originalUrl) => originalUrl,
               saveAttachment: async (bytes, suggestedName) => {
                 const normalized = await normalizeOneNoteAttachment(bytes, suggestedName);
-                const media = await storeMedia(prisma, userId, normalized.content, normalized.name, normalized.mimeType, { thumbnail: normalized.mimeType.startsWith('image/') });
+                const media = await storeMedia(prisma, userId, normalized.content, normalized.name, normalized.mimeType, { thumbnail: normalized.mimeType.startsWith('image/'), stagedImportKey });
                 writtenMedia.push(media);
                 summary.attachments++;
                 return { path: `/api/v1/media/${media.id}`, name: suggestedName };
               },
             });
 
-            const note = await prisma.$transaction(async (transaction) => {
+            const imported = await prisma.$transaction(async (transaction) => {
               const place = await transaction.place.upsert({
                 where: { userId_name: { userId, name: file.placeName } },
                 update: {},
@@ -167,15 +200,13 @@ export async function importOneNoteBackup(options: {
                   ...(page.lastModifiedUtc ? { updatedAt: page.lastModifiedUtc } : {}),
                 },
               });
-              await transaction.externalImport.create({ data: { userId, provider: 'onenote', sourceId: page.id, noteId: created.id } });
-              return created;
+              const externalImport = await transaction.externalImport.create({ data: { userId, provider: 'onenote', sourceId: page.id, noteId: created.id } });
+              return { note: created, importId: externalImport.id };
             });
-            try {
-              const { replaceContextChunks } = await import('../context.js');
-              await replaceContextChunks(prisma, userId, 'note', note.id, note.title, note.bodyMarkdown);
-            } catch (error) {
-              progress(`Imported page ${page.id}, but search indexing failed: ${error instanceof Error ? error.message : String(error)}`);
-            }
+            await prisma.media.updateMany({ where: { userId, stagedImportKey }, data: { stagedImportKey: null } }).catch((error) => {
+              progress(`Imported page ${page.id}, but attachment cleanup failed: ${error instanceof Error ? error.message : String(error)}`);
+            });
+            await indexImportedNote(prisma, userId, imported.importId, page.id, imported.note, progress);
             summary.imported++;
           } catch (error) {
             for (const media of writtenMedia) await removeStoredMedia(prisma, media);

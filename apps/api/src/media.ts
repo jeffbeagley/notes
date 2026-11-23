@@ -54,7 +54,7 @@ export async function storeMedia(
   content: Uint8Array,
   originalName: string,
   mimeType: string,
-  options: { extension?: string; thumbnail?: boolean } = {},
+  options: { extension?: string; thumbnail?: boolean; stagedImportKey?: string } = {},
 ) {
   const extension = (options.extension ?? originalName.match(/\.([^.]+)$/)?.[1] ?? 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
   const storageKey = `${randomUUID()}.${extension}`;
@@ -63,7 +63,7 @@ export async function storeMedia(
   await writeFile(mediaPath(storageKey), buffer, { flag: 'wx' });
   const thumbnailKey = options.thumbnail ? await writeThumbnail(buffer, storageKey) : null;
   try {
-    return await prisma.media.create({ data: { userId, storageKey, thumbnailKey, originalName: basename(originalName), mimeType, byteSize: buffer.length } });
+    return await prisma.media.create({ data: { userId, storageKey, thumbnailKey, originalName: basename(originalName), mimeType, byteSize: buffer.length, stagedImportKey: options.stagedImportKey } });
   } catch (error) {
     await unlink(mediaPath(storageKey)).catch(() => undefined);
     if (thumbnailKey) await unlink(mediaPath(thumbnailKey)).catch(() => undefined);

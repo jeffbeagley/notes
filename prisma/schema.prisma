@@ -208,13 +208,14 @@ model Note {
 
 /// Stable source identity for resumable, duplicate-safe imports.
 model ExternalImport {
-  id       String @id @default(cuid())
-  userId   String
-  provider String
-  sourceId String
-  noteId   String @unique
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  note     Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  id        String @id @default(cuid())
+  userId    String
+  provider  String
+  sourceId  String
+  noteId    String @unique
+  indexedAt DateTime?
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  note      Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
 
   @@unique([userId, provider, sourceId])
   @@index([userId, provider])
@@ -322,12 +323,14 @@ model Media {
   originalName   String
   mimeType       String
   byteSize       Int
+  stagedImportKey String?
   createdAt      DateTime   @default(now())
   user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   placeCovers    Place[]
   notebookCovers Notebook[]
 
   @@index([userId, createdAt])
+  @@index([userId, stagedImportKey])
 }
 
 model LlmConfig {

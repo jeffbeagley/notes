@@ -16,8 +16,8 @@ test('keeps only the newest dated backup for each section', async () => {
     await mkdir(dirname(older), { recursive: true });
     await writeFile(older, 'older');
     await writeFile(newer, 'newer');
-    await utimes(older, new Date('2026-01-01'), new Date('2026-01-01'));
-    await utimes(newer, new Date('2026-02-01'), new Date('2026-02-01'));
+    await utimes(older, new Date('2026-03-01'), new Date('2026-03-01'));
+    await utimes(newer, new Date('2026-01-01'), new Date('2026-01-01'));
 
     const files = await discoverOneNoteBackups(root);
     assert.equal(files.length, 1);
