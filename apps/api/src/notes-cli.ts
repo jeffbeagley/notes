@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { PrismaClient } from '@prisma/client';
 import { pathToFileURL } from 'node:url';
+import { closeContextQueue } from './context.js';
 import { NOTES_CLI_HELP, parseNotesCli } from './notes-cli-args.js';
 import { LOCAL_TOOL_DEFINITIONS, callLocalTool, resolveLocalUser } from './local-tools.js';
 
@@ -18,18 +19,13 @@ async function main() {
   if (command.action !== 'call') return;
 
   const prisma = new PrismaClient();
-  let queueStarted = false;
   try {
     const userId = await resolveLocalUser(prisma, command.username);
     const result = await callLocalTool(prisma, userId, command.name, command.args);
-    queueStarted = Boolean(result.refresh);
     console.log(command.json ? JSON.stringify(result, null, 2) : result.content);
     if (!result.ok) process.exitCode = 1;
   } finally {
-    if (queueStarted) {
-      const { closeQueue } = await import('./queue.js');
-      await closeQueue();
-    }
+    await closeContextQueue();
     await prisma.$disconnect();
   }
 }

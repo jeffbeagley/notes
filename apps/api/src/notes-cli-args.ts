@@ -35,6 +35,13 @@ export function localUsername(argv: string[], env: NodeJS.ProcessEnv = process.e
   return (index >= 0 ? argv[index + 1] : undefined) ?? env.NOTES_USERNAME ?? 'admin';
 }
 
+export function parseNotesMcpUsername(argv: string[], env: NodeJS.ProcessEnv = process.env) {
+  const args = [...argv];
+  const username = takeOption(args, '--username') ?? env.NOTES_USERNAME ?? 'admin';
+  if (args.length) throw new Error(`Unknown MCP option: ${args[0]}`);
+  return username;
+}
+
 export function parseNotesCli(argv: string[], env: NodeJS.ProcessEnv = process.env): CliCommand {
   const args = [...argv];
   const username = localUsername(args, env);

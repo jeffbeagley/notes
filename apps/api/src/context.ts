@@ -2,6 +2,19 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 
 type ContextClient = PrismaClient | Prisma.TransactionClient;
 export type DocumentKind = 'note' | 'journal';
+type QueueModule = typeof import('./queue.js');
+
+let queueModule: Promise<QueueModule> | undefined;
+
+function getQueueModule() {
+  return queueModule ??= import('./queue.js');
+}
+
+export async function closeContextQueue() {
+  if (!queueModule) return;
+  const { closeQueue } = await queueModule;
+  await closeQueue();
+}
 
 export function sanitizeForAssistant(markdown: string) {
   return markdown
@@ -55,7 +68,7 @@ export async function replaceContextChunks(client: ContextClient, userId: string
   if (chunks.length) {
     await client.contextChunk.createMany({ data: chunks.map((chunk, chunkIndex) => ({ userId, documentType, documentId, title, heading: chunk.heading, content: chunk.content, chunkIndex })) });
   }
-  const { enqueueEmbedChunks } = await import('./queue.js');
+  const { enqueueEmbedChunks } = await getQueueModule();
   await enqueueEmbedChunks(userId, documentType, documentId);
 }
 
