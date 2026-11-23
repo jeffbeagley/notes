@@ -8,6 +8,11 @@ import { discoverOneNoteBackups, normalizeOneNoteAttachment } from '../src/oneno
 import { convertPage } from '../src/onenote/onefile/convert.js';
 import { readSections } from '../src/onenote/onefile/package.js';
 
+test('closing an unused import context does not start Redis', async () => {
+  const { closeContextQueue } = await import('../src/context.js');
+  await closeContextQueue();
+});
+
 test('keeps only the newest dated backup for each section', async () => {
   const root = await mkdtemp(join(tmpdir(), 'notes-onenote-'));
   try {
