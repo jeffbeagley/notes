@@ -5,7 +5,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test test/onenote-import.test.ts",
     "dev": "tsx watch src/server.ts",
+    "import:onenote": "node dist/import-onenote.js",
     "start": "node dist/server.js"
   },
   "dependencies": {
