@@ -3193,6 +3193,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 
 @media (max-width: 800px) {
   .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: 3.5rem minmax(0, 1fr); padding: 0.75rem; }
+  .workspace.sidebar-collapsed { grid-template-columns: minmax(0, 1fr); }
   .workspace > article { grid-column: 1; grid-row: auto; }
   .workspace-topbar { gap: 0.4rem; padding: 0 0.25rem; }
   .mobile-nav-toggle { display: grid; width: 2.2rem; height: 2.2rem; flex: 0 0 auto; place-items: center; border: 1px solid #e0e2e5; border-radius: 7px; color: #555860; background: #fff; }
