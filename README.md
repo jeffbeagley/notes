@@ -63,6 +63,36 @@ The chart deploys the web app, API, media storage, database migration Job, optio
 
 Released images and charts are signed with keyless cosign. Images also include an SBOM and build provenance.
 
+## Local CLI and MCP
+
+The API build includes a lightweight `notes` CLI and a local-only MCP server.
+Both use the same user-scoped tool registry, so search, retrieval, and writes
+behave the same way from a terminal or an agent.
+
+```sh
+npm run build --workspace=@notes/api
+npm run cli --workspace=@notes/api -- tools
+npm run cli --workspace=@notes/api -- search kubernetes debugging
+npm run cli --workspace=@notes/api -- places --json
+npm run cli --workspace=@notes/api -- call create_task --args '{"title":"Review notes"}'
+```
+
+Set `NOTES_USERNAME` or pass `--username <name>` to choose a Notes user. The
+CLI also provides `get`, `list`, and generic `call` commands; run it with
+`--help` for the compact reference.
+
+The MCP entry point uses stdio and opens no network port:
+
+```sh
+npm run mcp --workspace=@notes/api -- --username admin
+```
+
+When Notes runs in Docker, an MCP host can launch the same process with
+`docker compose exec -T api node apps/api/dist/notes-mcp.js --username admin`.
+Configure that command and its arguments as a stdio server in the host. Local
+CLI/MCP access talks directly to the database and therefore has the selected
+user's read and write permissions; only run it on a trusted machine.
+
 ## AI Is Optional
 
 Notes works fully without an AI provider. When enabled, the assistant uses an OpenAI-compatible API of your choice: OpenAI, vLLM, Ollama, LM Studio, or another compatible service.

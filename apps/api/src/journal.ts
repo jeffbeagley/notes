@@ -1,7 +1,6 @@
 import type { PrismaClient, TaskSourceType, TaskStatus } from '@prisma/client';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { currentUser } from './auth.js';
-import { jobQueue, processCarryForward } from './queue.js';
 import { replaceContextChunks } from './context.js';
 import { callLlm, llmRouteOptions } from './llm.js';
 
@@ -144,6 +143,7 @@ export function registerJournalRoutes(app: FastifyInstance, prisma: PrismaClient
       data: { userId: user.id, journalDate: new Date(`${date}T00:00:00Z`), bodyMarkdown: journalBody(user.journalTemplate) },
     });
 
+    const { jobQueue, processCarryForward } = await import('./queue.js');
     jobQueue.add('carry_forward', { journalId: journal.id, userId: user.id }).catch(() => {
       processCarryForward(prisma, journal.id, user.id).catch(() => undefined);
     });

@@ -1,3 +1,4 @@
+import { once } from 'node:events';
 import { Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 import pino from 'pino';
@@ -5,12 +6,13 @@ import type { PrismaClient } from '@prisma/client';
 import { callLlm, embeddingsAvailable, embedTexts, getLlmConfig } from './llm.js';
 import type { DocumentKind } from './context.js';
 
-const logger = pino({ level: process.env.LOG_LEVEL ?? 'info', name: 'worker' });
+const logger = pino({ level: process.env.LOG_LEVEL ?? 'info', name: 'worker' }, pino.destination(2));
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
 export const redisConnection = new Redis(redisUrl, {
-  maxRetriesPerRequest: null,
+  maxRetriesPerRequest: 1,
+  enableOfflineQueue: false,
   enableReadyCheck: false,
 });
 
@@ -26,11 +28,27 @@ export const jobQueue = new Queue('notes-jobs', {
 export async function closeQueue() {
   await jobQueue.close().catch(() => undefined);
   await redisConnection.quit().catch(() => undefined);
+  redisConnection.disconnect();
+}
+
+async function producerReady() {
+  if (redisConnection.status === 'ready') return true;
+  if (redisConnection.status === 'end') return false;
+  try {
+    await once(redisConnection, 'ready', { signal: AbortSignal.timeout(1000) });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /// Best-effort, fire-and-forget: called after every note/journal save. Cheap to enqueue even when
 /// no embeddings model is configured; processEmbedChunks no-ops in that case.
 export async function enqueueEmbedChunks(userId: string, documentType: DocumentKind, documentId: string) {
+  if (!(await producerReady())) {
+    logger.warn({ userId, documentType, documentId }, 'skipping embed_chunks job while Redis is unavailable');
+    return;
+  }
   // Small delay so the job runs after the enclosing Prisma transaction has committed.
   await jobQueue.add('embed_chunks', { userId, documentType, documentId }, { delay: 2000 }).catch((err) => {
     logger.error({ err, userId, documentType, documentId }, 'failed to enqueue embed_chunks job');
