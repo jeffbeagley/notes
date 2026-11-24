@@ -28,6 +28,7 @@ export const jobQueue = new Queue('notes-jobs', {
 export async function closeQueue() {
   await jobQueue.close().catch(() => undefined);
   await redisConnection.quit().catch(() => undefined);
+  redisConnection.disconnect();
 }
 
 async function producerReady() {

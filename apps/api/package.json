@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "tsc --noEmit -p tsconfig.json",
-    "test": "tsx --test --test-force-exit test/local-tools.test.ts",
+    "test": "tsx --test test/local-tools.test.ts",
     "dev": "tsx watch src/server.ts",
     "cli": "node dist/notes-cli.js",
     "mcp": "node dist/notes-mcp.js",
