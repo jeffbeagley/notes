@@ -11,7 +11,7 @@
       <div v-if="oidcEnabled" class="login-divider"><span>or sign in with password</span></div>
       <p v-if="error" class="error">{{ error }}</p>
     </form>
-    <section v-else class="workspace" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+    <section v-else class="workspace" :class="{ 'sidebar-collapsed': sidebarCollapsed, 'sidebar-resizing': sidebarResizing }" :style="{ '--sidebar-width': `${sidebarWidth}px` }">
       <aside class="app-sidebar" :class="{ 'mobile-nav-open': mobileNavOpen }">
         <div class="sidebar-heading"><button class="brand" title="Go to home" @click="goHome"><span class="brand-mark">N</span><span class="nav-label">Notes</span></button><button class="sidebar-toggle" :aria-expanded="!sidebarCollapsed" :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'" @click="sidebarCollapsed = !sidebarCollapsed"><PanelLeft :size="15" :stroke-width="1.8" /></button></div>
         <nav class="primary-nav" aria-label="Primary navigation" @click="mobileNavOpen = false">
@@ -77,6 +77,22 @@
           <button class="profile-card" @click="logout"><span class="avatar">{{ (user.displayName || user.username).slice(0, 1).toUpperCase() }}</span><span class="profile-copy nav-label"><strong>{{ user.displayName || user.username }}</strong><small>Sign out</small></span><ChevronDown class="profile-chevron" :size="14" :stroke-width="1.8" /></button>
         </div>
       </aside>
+      <div
+        v-if="!sidebarCollapsed"
+        class="sidebar-resizer"
+        role="separator"
+        aria-label="Resize navigation sidebar"
+        aria-orientation="vertical"
+        :aria-valuemin="SIDEBAR_MIN_WIDTH"
+        :aria-valuemax="SIDEBAR_MAX_WIDTH"
+        :aria-valuenow="sidebarWidth"
+        tabindex="0"
+        title="Drag to resize navigation; double-click to reset"
+        @pointerdown="startSidebarResize"
+        @lostpointercapture="stopSidebarResize"
+        @dblclick="resetSidebarWidth"
+        @keydown="handleSidebarResizeKey"
+      />
       <button v-if="mobileNavOpen" class="mobile-nav-backdrop" aria-label="Close navigation" @click="mobileNavOpen = false" />
       <header class="workspace-topbar">
         <button class="mobile-nav-toggle" :aria-expanded="mobileNavOpen" aria-label="Open navigation" @click="mobileNavOpen = !mobileNavOpen"><Menu :size="18" :stroke-width="1.8" /></button>
@@ -571,6 +587,14 @@ const briefing = ref<Note | null>(null);
 const generatingBriefing = ref(false);
 const activeSummaryTitle = ref<string | null>(null);
 const sidebarCollapsed = ref(false);
+const SIDEBAR_DEFAULT_WIDTH = 216;
+const SIDEBAR_MIN_WIDTH = 216;
+const SIDEBAR_MAX_WIDTH = 480;
+const storedSidebarWidth = Number(localStorage.getItem('notes-sidebar-width'));
+const sidebarWidth = ref(Number.isFinite(storedSidebarWidth) ? Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, storedSidebarWidth)) : SIDEBAR_DEFAULT_WIDTH);
+const sidebarResizing = ref(false);
+let sidebarResizeStartX = 0;
+let sidebarResizeStartWidth = SIDEBAR_DEFAULT_WIDTH;
 const mobileNavOpen = ref(false);
 const assistantHistoryOpen = ref(false);
 const view = ref<'home' | 'notes' | 'places' | 'place' | 'notebook' | 'unfiled' | 'journal' | 'journalArchive' | 'journalEntry' | 'tasks' | 'briefing' | 'search' | 'assistant' | 'summaries' | 'settings'>('home');
@@ -2733,6 +2757,51 @@ watch([activeNote, journal, view, isHistoricalJournal], () => {
 
 watch(() => route.fullPath, () => void syncRoute());
 
+function setSidebarWidth(width: number, persist = false) {
+  sidebarWidth.value = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(width)));
+  if (persist) localStorage.setItem('notes-sidebar-width', String(sidebarWidth.value));
+}
+
+function resizeSidebar(event: PointerEvent) {
+  if (event.buttons === 0) return stopSidebarResize();
+  setSidebarWidth(sidebarResizeStartWidth + event.clientX - sidebarResizeStartX);
+}
+
+function stopSidebarResize() {
+  if (!sidebarResizing.value) return;
+  sidebarResizing.value = false;
+  window.removeEventListener('pointermove', resizeSidebar);
+  window.removeEventListener('pointerup', stopSidebarResize);
+  window.removeEventListener('pointercancel', stopSidebarResize);
+  localStorage.setItem('notes-sidebar-width', String(sidebarWidth.value));
+}
+
+function startSidebarResize(event: PointerEvent) {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  sidebarResizeStartX = event.clientX;
+  sidebarResizeStartWidth = sidebarWidth.value;
+  sidebarResizing.value = true;
+  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  window.addEventListener('pointermove', resizeSidebar);
+  window.addEventListener('pointerup', stopSidebarResize);
+  window.addEventListener('pointercancel', stopSidebarResize);
+}
+
+function resetSidebarWidth() {
+  setSidebarWidth(SIDEBAR_DEFAULT_WIDTH, true);
+}
+
+function handleSidebarResizeKey(event: KeyboardEvent) {
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+    event.preventDefault();
+    setSidebarWidth(sidebarWidth.value + (event.key === 'ArrowRight' ? 16 : -16), true);
+  } else if (event.key === 'Home' || event.key === 'End') {
+    event.preventDefault();
+    setSidebarWidth(event.key === 'Home' ? SIDEBAR_MIN_WIDTH : SIDEBAR_MAX_WIDTH, true);
+  }
+}
+
 onMounted(async () => {
   window.addEventListener('keydown', handleKeydown);
   try {
@@ -2754,7 +2823,10 @@ onBeforeUnmount(() => {
   void saveNow();
   void saveJournal();
 });
-onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown);
+  stopSidebarResize();
+});
 </script>
 
 <style>
@@ -2811,7 +2883,7 @@ input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; color:
 /* Main workspace presentation */
 :root { color: #1c1d21; background: #eef0f2; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 body { margin: 0; min-width: 0; background: #eef0f2; }
-.workspace { display: grid; grid-template-columns: 13.5rem minmax(0, 1fr); min-height: 100vh; grid-template-rows: 3.5rem minmax(0, 1fr); gap: 0; padding: 0; box-sizing: border-box; }
+.workspace { --sidebar-width: 13.5rem; display: grid; position: relative; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); min-height: 100vh; grid-template-rows: 3.5rem minmax(0, 1fr); gap: 0; padding: 0; box-sizing: border-box; }
 .workspace > aside { display: flex; flex-direction: column; gap: 0.3rem; padding: 1.5rem 0.9rem 1rem; background: #173d36; color: #e7e9dd; grid-row: 1 / -1; }
 .workspace > article { grid-column: 2; grid-row: 2; }
 .workspace-topbar { display: flex; align-items: center; gap: 0.75rem; min-width: 0; overflow: visible; padding: 0 1.2rem; border-bottom: 1px solid #e4e5e7; }
@@ -2842,7 +2914,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .note-link.active .nav-icon { color: #8055eb; }
 .sidebar-section-label { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0.55rem 0.35rem; border-top: 1px solid #eeeff1; color: #a2a5ab; font-size: 0.67rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 .sidebar-section-label button { padding: 0; color: #858991; background: transparent; font-size: 1rem; }
-.library-tree { display: grid; gap: 0.1rem; max-height: 24rem; overflow-y: auto; padding: 0 0.05rem 0.4rem; }
+.library-tree { display: grid; gap: 0.1rem; max-height: 24rem; overflow-x: hidden; overflow-y: auto; padding: 0 0.05rem 0.4rem; }
 .tree-row { display: flex; align-items: center; gap: 0.1rem; border-radius: 7px; }
 .tree-row.is-drop-target { box-shadow: inset 0 0 0 1.5px #8055eb; background: #f6f3ff; }
 .tree-row .tree-link { min-width: 0; flex: 1; }
@@ -2856,8 +2928,16 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .tree-add { display: flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.55rem; border-radius: 6px; color: #9a9da4; background: transparent; font-size: 0.68rem; }
 .tree-add:hover { color: #7650dc; background: #f2efff; }
 .sidebar-error { margin: 0.3rem 0.55rem 0; color: #b64b42; font-size: 0.65rem; }
-.sidebar-collapsed .library-tree { max-height: none; }
-.sidebar-collapsed .tree-twisty, .sidebar-collapsed .tree-add, .sidebar-collapsed .tree-children { display: none; }
+@media (min-width: 801px) {
+  .sidebar-collapsed .library-tree { max-height: none; }
+  .sidebar-collapsed .tree-twisty, .sidebar-collapsed .tree-add, .sidebar-collapsed .tree-children { display: none; }
+}
+.sidebar-resizer { position: absolute; top: 0.5rem; bottom: 0.5rem; left: calc(var(--sidebar-width) - 0.75rem); z-index: 8; width: 1.5rem; padding: 0; border-radius: 0; cursor: col-resize; touch-action: none; background: transparent; }
+.sidebar-resizer::after { content: ''; position: absolute; top: 0.75rem; left: calc(50% - 1px); bottom: 0.75rem; width: 2px; border-radius: 999px; background: transparent; transition: background 120ms; }
+.sidebar-resizer:hover::after, .sidebar-resizer:focus-visible::after, .sidebar-resizing .sidebar-resizer::after { background: #8b5cf6; }
+.sidebar-resizer:focus-visible { outline: 2px solid #8b5cf6; outline-offset: -2px; }
+.sidebar-resizing, .sidebar-resizing * { cursor: col-resize !important; user-select: none; }
+.sidebar-collapsed .sidebar-resizer { display: none; }
 
 .library-view { display: flex; flex-direction: column; gap: 1.25rem; padding: 1.5rem 1.5rem 1rem; overflow-y: auto; }
 .library-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
@@ -2905,19 +2985,21 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 .assistant-choice.chosen { border-color: #8b5cf6; background: #f2efff; color: #5b3fc4; opacity: 1; }
 .assistant-choice.chosen .assistant-choice-label { font-weight: 650; }
 .assistant-choices-answered { margin: 0; color: #9a9ea8; font-size: 0.68rem; }
-.workspace.sidebar-collapsed { grid-template-columns: 4.5rem minmax(0, 1fr); }
-.sidebar-collapsed .app-sidebar { padding-inline: 0.55rem; }
-.sidebar-collapsed .sidebar-heading { flex-direction: column; justify-content: center; gap: 0.8rem; padding-inline: 0; }
-.sidebar-collapsed .brand { gap: 0; }
-.sidebar-collapsed .sidebar-heading > .sidebar-toggle { position: static; }
-.sidebar-collapsed .primary-nav { margin-top: 0; }
-.sidebar-collapsed .note-link { justify-content: center; padding-inline: 0.45rem; }
-.sidebar-collapsed .sidebar-section-label { justify-content: center; padding-inline: 0; }
-.sidebar-collapsed .sidebar-section-label button { position: static; }
-.sidebar-collapsed .note-list { margin-top: 0; }
-.sidebar-collapsed .nav-label { display: none; }
-.sidebar-collapsed .profile-card { grid-template-columns: 1fr; justify-items: center; padding-inline: 0; }
-.sidebar-collapsed .profile-chevron { display: none; }
+@media (min-width: 801px) {
+  .workspace.sidebar-collapsed { grid-template-columns: 4.5rem minmax(0, 1fr); }
+  .sidebar-collapsed .app-sidebar { padding-inline: 0.55rem; }
+  .sidebar-collapsed .sidebar-heading { flex-direction: column; justify-content: center; gap: 0.8rem; padding-inline: 0; }
+  .sidebar-collapsed .brand { gap: 0; }
+  .sidebar-collapsed .sidebar-heading > .sidebar-toggle { position: static; }
+  .sidebar-collapsed .primary-nav { margin-top: 0; }
+  .sidebar-collapsed .note-link { justify-content: center; padding-inline: 0.45rem; }
+  .sidebar-collapsed .sidebar-section-label { justify-content: center; padding-inline: 0; }
+  .sidebar-collapsed .sidebar-section-label button { position: static; }
+  .sidebar-collapsed .note-list { margin-top: 0; }
+  .sidebar-collapsed .nav-label { display: none; }
+  .sidebar-collapsed .profile-card { grid-template-columns: 1fr; justify-items: center; padding-inline: 0; }
+  .sidebar-collapsed .profile-chevron { display: none; }
+}
 .sidebar-footer { display: grid; gap: 0.15rem; margin-top: auto; padding-top: 1rem; border-top: 1px solid #eeeff1; }
 .profile-card { display: grid; grid-template-columns: 1.75rem minmax(0, 1fr) auto; gap: 0.5rem; align-items: center; margin: 0.55rem 0.15rem 0; padding: 0.5rem 0.25rem; color: #36373b; background: transparent; text-align: left; }
 .avatar { display: grid; width: 1.65rem; height: 1.65rem; place-items: center; border-radius: 50%; color: #fff; background: #4e8b83; font-size: 0.68rem; font-weight: 700; }
@@ -3113,10 +3195,12 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
 :root[data-theme='dark'] .tag-pill-add { border-color: #45464d; color: #c4a9ff; }
 :root[data-theme='dark'] .tag-pill-add:hover { background: #343044; }.ai-dialog { display: grid; gap: 0.8rem; width: min(100%, 36rem); }.ai-dialog > header { display: flex; align-items: center; justify-content: space-between; }.ai-dialog label { display: grid; gap: 0.35rem; color: #666a73; font-size: 0.72rem; }.ai-dialog :is(input, select) { width: 100%; box-sizing: border-box; border: 1px solid #e0e2e5; border-radius: 6px; background: #fff; color: #45474e; }.ai-dialog > button { width: fit-content; padding: 0.5rem 0.7rem; border-radius: 6px; color: #fff; background: #8b5cf6; font-size: 0.72rem; }.tag-suggestions { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }.tag-suggestions strong { flex-basis: 100%; color: #666a73; font-size: 0.72rem; }.tag-suggestions button { padding: 0.35rem 0.55rem; border: 1px solid #e0e2e5; border-radius: 999px; color: #666a73; background: #fff; font-size: 0.7rem; }.tag-suggestions button.selected { border-color: #c9baf8; color: #7650dc; background: #f2efff; }.dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }.dialog-actions button { padding: 0.45rem 0.65rem; border-radius: 6px; color: #fff; background: #8b5cf6; font-size: 0.7rem; }.dialog-actions .quiet { color: #666a73; background: #fff; }.rewrite-source, .rewrite-diff { display: grid; gap: 0.45rem; padding: 0.75rem; border: 1px solid #e5e6e8; border-radius: 6px; background: #fafafa; color: #555860; font-size: 0.78rem; line-height: 1.55; }.rewrite-source p { margin: 0; white-space: pre-wrap; }.rewrite-diff del { padding: 0.35rem; color: #a33f38; background: #fff1f0; text-decoration: line-through; }.rewrite-diff ins { padding: 0.35rem; color: #236b50; background: #effaf4; text-decoration: none; }
 
-@media (max-width: 700px) {
+@media (max-width: 800px) {
   .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: 3.5rem minmax(0, 1fr); padding: 0.75rem; }
+  .workspace.sidebar-collapsed { grid-template-columns: minmax(0, 1fr); }
   .workspace > article { grid-column: 1; grid-row: auto; }
   .workspace-topbar { gap: 0.4rem; padding: 0 0.25rem; }
+  .sidebar-toggle { display: none; }
   .mobile-nav-toggle { display: grid; width: 2.2rem; height: 2.2rem; flex: 0 0 auto; place-items: center; border: 1px solid #e0e2e5; border-radius: 7px; color: #555860; background: #fff; }
   .mobile-nav-toggle:hover { color: #7650dc; border-color: #c9baf8; background: #faf9ff; }
   .mobile-nav-backdrop { display: block; position: fixed; inset: 0; z-index: 9; width: 100%; height: 100%; border-radius: 0; background: #24252a3d; cursor: default; }
@@ -3142,6 +3226,7 @@ body { margin: 0; min-width: 0; background: #eef0f2; }
   .workspace > aside.app-sidebar.mobile-nav-open { transform: translateX(0); }
   .workspace > aside.app-sidebar.mobile-nav-open { overflow-y: auto; }
   .workspace > aside.app-sidebar.mobile-nav-open .library-tree { flex: 0 0 auto; min-height: 0; max-height: none; overflow: visible; }
+  .sidebar-resizer { display: none; }
   .sidebar-footer { display: grid; margin-top: 1rem; }
   .sidebar-footer { flex: 0 0 auto; }
   .home-view { padding: 1.5rem 0.4rem 2rem; }
